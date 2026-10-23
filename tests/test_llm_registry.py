@@ -261,3 +261,25 @@ class StreamCleanupTests(unittest.TestCase):
             time.sleep(0.02)
         self.assertTrue(model.provider.closed, "后台异步生成器未关闭")
         self.assertLess(model.provider.emitted, 1000)
+
+
+class HostAbortTests(unittest.TestCase):
+    def test_on_delta_raise_cancelled_maps_to_cancelled_status(self):
+        from enter_harness import Agent, AgentConfig, InMemoryStore, RunRequest, Scope
+        from enter_harness.errors import CancelledError
+
+        register_provider("abort-stream", lambda **kw: FakeStreamingProvider(**kw))
+        self.addCleanup(lambda: unregister_provider("abort-stream"))
+
+        def on_delta(text):
+            raise CancelledError("client gone")
+
+        model = create_model("abort-stream", on_delta=on_delta)
+        agent = Agent(AgentConfig(
+            scope=Scope("t1", "a1", "u1", ("assistant",)),
+            model=model, store=InMemoryStore()))
+        result = agent.run(RunRequest(objective="hi"))
+        self.assertEqual(result.status, "cancelled")
+        self.assertEqual(result.error.code, "cancelled")
+        # 取消不是执行失败，宿主不应据此落一条失败助手消息
+        self.assertNotEqual(result.status, "error")

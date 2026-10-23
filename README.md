@@ -43,7 +43,7 @@ result = agent.run(RunRequest(objective="分析本周销售数据"))
 | 可恢复 | 运行状态与检查点（start / tool / approval / done），失败可续跑 |
 | 可横向扩展 | PostgreSQL 后端 + 部分唯一索引 + advisory lock，多副本并发写不撞车 |
 | 可替换、不被绑定 | 模型、存储、权限、事件全部端口化；换模型 / 换库不改业务代码 |
-| 可验证 | 366 项单元测试 + 三后端端到端（含审批闭环），发版有基线 |
+| 可验证 | 367 项单元测试 + 三后端端到端（含审批闭环），发版有基线 |
 
 ---
 
@@ -225,7 +225,7 @@ ports = build_local_ports("/data/agent", backend="postgres",    # 多副本
 
 ### 10. 可验证
 
-- 366 项单元测试（公开仓基线；本地含旧宿主测试时为 371）；
+- 367 项单元测试（公开仓基线；本地含旧宿主测试时为 372）；
 - 存储端到端覆盖 SQLite / Markdown / PostgreSQL，并串起
   记忆 → 上下文 → 知识审核 → 检查点 → 审计链 → Agent 运行 → 审批闭环；
 - PostgreSQL 用例在未设 `HARNESS_PG_DSN` 时自动跳过，不拖累本地开发；
