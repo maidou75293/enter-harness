@@ -1,0 +1,65 @@
+# Python 环境与构建产物
+.venv-realenv/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 运行数据与日志（含数据库、租户数据）
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+
+# 本地检查与前端依赖
+.check-stamp
+node_modules/
+docs/~$*
+*.tmp
+
+# 内部资料：不随开源仓发布
+BRIEF.md
+TODO.md
+CLAUDE.md
+docs/商业介绍.md
+docs/企业服务-规范选型-v1.md
+docs/真实环境验证.md
+docs/实现记录.md
+docs/agent-core-抽取记录.md
+docs/验收报告.md
+docs/gateway-agent-integration.md
+
+# 内部真实环境探针（含本机路径）
+tests/realenv/
+
+# 旧宿主 / 演示层：本地保留，不进入开源仓
+/app/
+/web/
+/agentctl
+/start.sh
+/bootstrap.sh
+/mcp_servers/
+/skills/
+/tests/test_agent_core_app_bridge.py
+/tests/test_cli_contract.py
+
+# 旧文档与生成图：不进入开源仓
+/docs/*.pdf
+/docs/*.pptx
+/docs/*.png
+/docs/实现说明.md
+/docs/架构-模块清单.md
+/docs/系统介绍.md
+/docs/核心模型-优化议题-v1.md
+/docs/核心模型-内核化提案-v0.md
+/docs/核心模型-定稿-v1.md
+/docs/统一模型-*.md
+/docs/统一规范-*.md
+/docs/调研*.md

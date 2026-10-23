@@ -1,0 +1,10 @@
+# agent-arch 依赖（清华镜像安装）
+fastapi>=0.110
+uvicorn[standard]>=0.29
+langgraph>=1.0
+langgraph-checkpoint-sqlite>=3.0
+langchain-core>=1.0
+mcp>=2.0
+httpx>=0.27
+pydantic>=2.0
+python-multipart>=0.0.9

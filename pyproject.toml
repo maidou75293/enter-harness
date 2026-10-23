@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-core"
+version = "1.1.0"
+description = "可复用智能体内核：LangGraph 执行器、工具/权限/压缩/hooks/子代理，以及多智能体模块 API"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "langgraph>=1.0",
+    "langgraph-checkpoint-sqlite>=3.0",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# 宿主自带的模型/存储适配器通常只需要上面三项；OCR/文档类能力按需引入
+ocr = ["pypdf>=6.0"]
+postgres = ["psycopg[binary]>=3.1"]
+
+[tool.setuptools.packages.find]
+# 只打包 agent_core；app/、web/、tests/、skills/ 属于宿主或测试资产，不进入库
+include = ["agent_core*"]

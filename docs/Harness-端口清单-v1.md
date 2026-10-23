@@ -1,0 +1,248 @@
+# Harness 端口清单 v1
+
+> 10 个端口 = 已有 5 个 + 新增 5 个。
+> 端口只定义契约，不定义存储、模型、厂商。
+> 命名规则见 `Harness-命名规范-v1.md`。
+> 已有 5 个见 `agent_core/context/ports.py`；新增 5 个在 `agent_core/harness/ports.py`，均已有默认实现。
+> 存储后端有三套（SQLite / Markdown / PostgreSQL），怎么选与怎么接见
+> `Harness-使用手册-v1.md` 与 `本地存储格式-v1.md`。
+
+## 0. 总表
+
+| # | 端口 | 归属块 | 方法 | 状态 |
+|---|---|---|---|---|
+| 1 | `IdentityPort` | 定义层 | `resolve` | 协议 + `StaticIdentityPort` |
+| 2 | `ContextPort` | context | `list_blocks` / `get_block` | 协议已有 |
+| 3 | `MemoryPort` | context / state | `query` / `upsert` / `archive` | 协议 + `StoreMemoryPort` / `MarkdownMemoryPort` / `PostgresMemoryPort` |
+| 4 | `KnowledgePort` | context | `search` / `get_chunk` | 协议 + `SQLiteKnowledgePort` / `MarkdownKnowledgePort` / `PostgresKnowledgePort` |
+| 5 | `AccessPolicyPort` | action | `can` | 协议已有 |
+| 6 | `IngestPort` | observation | `collect` | 已实现 `DefaultIngestPort` |
+| 7 | `ActionPort` | action | `list_tools` / `call` / `request_approval` / `resume` | 已实现 `ToolActionPort` |
+| 8 | `StatePort` | state | `load` / `save` / `checkpoint` / `resume` / `list_checkpoints` | `SQLiteStatePort` / `PostgresStatePort` |
+| 9 | `VerifyPort` | verification | `check` | 已实现 `RuleVerifyPort` |
+| 10 | `AuditPort` | verification | `emit` / `query` | `SQLiteAuditPort` / `PostgresAuditPort` |
+
+## 1. IdentityPort（身份）
+
+- **目的**：提供账号体系里的客观事实，确定这一轮「谁在操作」。
+- **方法**：`resolve(req=None) -> dict`
+- **返回**：`tenant_id`、`user_id`、`roles`、`department`、`capabilities`、`writable_scopes`。
+- **谁实现**：产品的账号 / 认证系统。
+- **边界**：只读；不得从对话推断；模型自述无效；租户由运行时注入。
+- **现状**：协议已有，无默认实现。
+
+## 2. ContextPort（上下文块）
+
+- **目的**：让内核按需取块，元数据便宜、正文按需。
+- **方法**：
+  - `list_blocks(scope="", scope_id="") -> Sequence[BlockMeta]`
+  - `get_block(block_id, version=0) -> Block | None`
+- **谁实现**：宿主的块存储（记忆、知识、配置都可适配）。
+- **边界**：`list_blocks` 不返回正文；`get_block` 才读正文；正文必须带指纹。
+- **现状**：协议已有；测试里有 `FakeContext`。
+
+## 3. MemoryPort（长期记忆）
+
+- **目的**：语义 / 程序性记忆的读写与归档。
+- **方法**：
+  - `query(req=None) -> Sequence[MemoryRecord]`
+  - `upsert(item: MemoryRecord) -> WriteResult`
+  - `archive(ids, reason="policy") -> int`
+- **WriteResult**：`{action: append|supersede|noop|invalid, id, replaced_id, reason}`。
+- **谁实现**：`StoreMemoryPort`（SQLite）/ `MarkdownMemoryPort`（人可读写文件）/ `PostgresMemoryPort`；产品也可换远端。
+- **边界**：只追加；不做物理删；租户与范围必须进查询条件。
+- **现状**：协议与默认实现已统一为 `WriteResult`；SQLite / Markdown / PostgreSQL 三种后端。
+
+## 4. KnowledgePort（知识）
+
+- **目的**：按问题检索知识块，并支持按 id 回取。
+- **方法**：
+  - `search(query, top_k=4, scope="") -> Sequence[KnowledgeChunk]`
+  - `get_chunk(chunk_id) -> KnowledgeChunk | None`
+- **返回**：每块至少含 `id`、`content`、`title`、`source`、`content_hash`、`review_status`。
+- **谁实现**：知识库 / 向量库适配器。
+- **边界**：只返回 `approved`；无 `source` 的命中由调用方丢弃；检索必须带租户过滤。
+- **现状**：`search` 与 `get_chunk` 均已补齐；SQLite / Markdown / PostgreSQL 三种后端。
+
+## 5. AccessPolicyPort（访问策略）
+
+- **目的**：判断某个身份能否对某个目标做某个动作。
+- **方法**：`can(identity, action, target) -> bool`
+- **动作**：`read` / `write` / `delete` / `approve`。
+- **谁实现**：产品权限系统（RBAC / ABAC）。
+- **边界**：异常按拒绝处理；不做业务判断；不返回原因串（原因走审计）。
+- **现状**：协议已有；测试里有 `AllowAll` / `TenantPolicy`。
+
+## 6. IngestPort（输入采集）
+
+- **目的**：把用户输入、工具结果、环境事件、文件引用统一收进来。
+- **方法**：`collect(req) -> Sequence[RawInput]`
+- **RawInput**：`{source, content, kind_hint, scope, scope_id, meta}`。
+- **谁实现**：产品适配器；内核只做归一并入。
+- **边界**：不直接产出 `Block`（归一规则由内核统一）；不读记忆表；不决定预算。
+- **现状**：已实现 `DefaultIngestPort`（消息 / 工具结果 / 事件归一）。
+
+## 7. ActionPort（动作 / 工具）
+
+- **目的**：工具清单、调用、审批、恢复的唯一入口。
+- **方法**：
+  - `list_tools(identity, scope="") -> Sequence[dict]`
+  - `call(identity, name, args, ctx) -> ActionResult`
+  - `request_approval(identity, call) -> ApprovalTicket`
+  - `resume(ticket_id, decision) -> ActionResult`
+- **谁实现**：`agent_core/tools` + `policy.py`；LangGraph 负责暂停/恢复。
+- **边界**：白名单 → 策略 → 沙箱 → 执行；高风险动作必须能暂停。
+- **可见性**：`list_tools` 与 `call` 都按 `identity` 过滤（`call` 另受 `scope`
+  旧语义约束）。工具用 `scope` / `tenants` / `roles` 声明限制；声明了限制但身份
+  不满足时**默认拒绝**。未声明限制的工具对所有身份可见（共享工具）。
+  审批恢复（`ctx.approved_override=True`）已经过一次授权，跳过重判。
+- **装配校验**：`ToolActionPort.validate()` 检查工具名、JSON Schema、
+  `tenants` / `roles` 类型；`PortSet.check()` 会调用它，失败则启动失败。
+- **不负责**：工具注册/注销、handler 生命周期、热更新。这些属于宿主工具目录，
+  注册 API 不进入 Harness。
+- **现状**：`ToolActionPort` + 内存 / SQLite 审批队列；已接入 `Agent`（`approval_queue` / `approval_decision`）。
+
+## 8. StatePort（状态）
+
+- **目的**：会话、运行状态、检查点的统一读写。
+- **方法**：
+  - `load(thread_id)` / `save(thread_id, state)`
+  - `checkpoint(thread_id, node, state) -> checkpoint_id`
+  - `resume(thread_id)` / `list_checkpoints(thread_id)`
+- **谁实现**：LangGraph checkpointer + 宿主会话/存储。
+- **边界**：只存运行状态，不存长期记忆；记忆走 `MemoryPort`；租户隔离。
+- **可选清理**：`prune(before=None, retention_days=30) -> int`，删除过期状态与检查点；
+  不在协议方法内，避免破坏宿主自定义 StatePort。
+- **现状**：`SQLiteStatePort`（不依赖 langgraph）与 `PostgresStatePort` 已实现；已接入 `Agent` 的 start / tool / approval / done 检查点。
+
+## 9. VerifyPort（验收）
+
+- **目的**：判断结果是否满足验收标准，决定重试 / 补偿 / 升级。
+- **方法**：`check(result, criteria, ctx) -> Verdict`
+- **Verdict**：`{passed, score, reasons, retryable}`。
+- **谁实现**：产品验收规则 + 内置检查（schema、测试、引用）。
+- **边界**：只判定，不执行修复；修复由控制层决定。
+- **现状**：`RuleVerifyPort` 已实现；已接入 `Agent`（`verify_port` + `verify_criteria`）。
+
+## 10. AuditPort（审计）
+
+- **目的**：记录谁在什么时候对什么做了什么、结果如何，供合规查询。
+- **方法**：
+  - `emit(event: AuditEvent) -> AuditEvent`（返回落库后的记录）
+  - `query(filter) -> Sequence[AuditEvent]`
+- **AuditEvent**：`{id, tenant_id, actor, action, target, decision, reason, trace_id, at, prev_hash, hash}`。
+- **谁实现**：产品审计库 / SIEM；默认落独立表。
+- **边界**：只追加；防篡改（哈希链）；留存 ≥6 个月；不参与业务判断。
+- **现状**：`SQLiteAuditPort` / `PostgresAuditPort` 已实现哈希链、查询、`verify_chain`、默认 180 天留存；已接入 `Agent` 的 run / tool / approval / verify 事件。
+
+## 11. 与已有端口的冲突
+
+| 已有 | 冲突 | 收敛方式 |
+|---|---|---|
+| `agent_core.ports.ToolPolicyPort` | 与 `AccessPolicyPort` 名字近 | `ToolPolicyPort` 管工具风险决策，`AccessPolicyPort` 管数据访问；旧 `PolicyPort` 仅保留别名 |
+| `agent_core.ports.StorePort` | 与 `MemoryPort` 重叠 | `StorePort` 当存储后端，`MemoryPort` 当语义模型 |
+| `agent_core.ports.EventSink` | 与 `AuditPort` 重叠 | `EventSink` 记运行事件，`AuditPort` 记合规审计；可同一实现，两个契约 |
+| `MemoryPort.upsert -> str` | 默认实现返回 `dict` | 已统一为 `WriteResult`（dict 子类，四态） |
+
+原则：**端口可以少，不能重；一个能力只留一个契约。**
+
+## 12. 按逻辑链路的调用顺序
+
+```text
+定义(0) → 采集(1) → 选择(2) → 拼装(3) → 请求(4)
+                                          │
+                          ┌───────────────┼───────────────┐
+                          ▼               ▼               ▼
+                       行动(5)         状态(6)         验证(7)
+                          │                               │
+                          └── 工具结果回采 → 选择(2)       ▼
+                                                     回流(8) → 存储 → 下一轮采集(1)
+
+审计(9)：横切 0~8
+```
+
+### 12.1 一级：模块
+
+| # | 模块 | 包含端口 | 端口数 | 现状 |
+|---|---|---|---|---|
+| 1 | 定义层 | `IdentityPort` | 1 | 有协议 |
+| 2 | Observation | `IngestPort` | 1 | 新增 |
+| 3 | Context | `ContextPort` / `MemoryPort` / `KnowledgePort` | 3 | 较完整 |
+| 4 | Control | `ModelPort` + LangGraph | 1 + 引擎 | 有 |
+| 5 | Action | `ActionPort` / `AccessPolicyPort` | 2 | 部分 |
+| 6 | State | `StatePort` | 1 | 新增 |
+| 7 | Verification | `VerifyPort` / `AuditPort` | 2 | 部分 |
+
+### 12.2 二级：端口与方法
+
+| 一级模块 | 二级端口 | 方法 | 链路步 | 输入 → 输出 | 现状 |
+|---|---|---|---|---|---|
+| 1 定义层 | 1.1 `IdentityPort` | `resolve` | 0 | req → identity | 有协议 |
+| 2 Observation | 2.1 `IngestPort` | `collect` | 1 | IngestRequest → RawInput[] | 新增 |
+| 3 Context | 3.1 `ContextPort` | `list_blocks` / `get_block` | 2 | scope → BlockMeta[] / Block | 有协议 |
+| 3 Context | 3.2 `MemoryPort` | `query` | 2 | query → MemoryRecord[] | `StoreMemoryPort` |
+| 3 Context | 3.3 `KnowledgePort` | `search` / `get_chunk` | 2 | query → Chunk[] | 已补齐 |
+| 3 Context | 3.4 （内核） | `assemble` | 3 | blocks → text / trace | 已实现 |
+| 3 Context | 3.5 `MemoryPort` | `upsert` / `archive` | 8 | MemoryRecord → WriteResult | 四态已统一 |
+| 4 Control | 4.1 `ModelPort` | `complete` / `stream` | 4 | messages → ModelResponse | 已有（基础） |
+| 4 Control | 4.2 LangGraph | 图执行 / 断点 / 中断 | 4~7 | state → state | 已有 |
+| 5 Action | 5.1 `ActionPort` | `list_tools` / `call` | 5 | identity, args → ActionResult | `ToolActionPort` |
+| 5 Action | 5.2 `AccessPolicyPort` | `can` | 5 | identity, action, target → bool | 有协议 |
+| 5 Action | 5.3 `ActionPort`（审批） | `request_approval` / `resume` | 5a | call / decision → ticket / ActionResult | 已实现 |
+| 6 State | 6.1 `StatePort` | `load` / `save` / `checkpoint` / `resume` | 6 | thread_id → state | `SQLiteStatePort` |
+| 7 Verification | 7.1 `VerifyPort` | `check` | 7 | result, criteria → Verdict | `RuleVerifyPort` |
+| 7 Verification | 7.2 `AuditPort` | `emit` / `query` | 9 | AuditEvent → — | `SQLiteAuditPort` |
+
+说明：
+
+- `ModelPort` 是基础端口，不在治理的 10 个端口内；
+- 第 5 步之后工具结果要**回到第 2 步**重新选择/拼装，这是内循环；
+- 第 6 步状态持久化贯穿控制，不要求每步都存；
+- 第 9 步审计横切，不参与主链路判断。
+
+## 13. 代码落点（v1 已重构）
+
+| 文件 | 内容 |
+|---|---|
+| `agent_core/harness/types.py` | `RawInput` / `ActionResult` / `ApprovalTicket` / `Verdict` / `AuditEvent` / `Checkpoint` |
+| `agent_core/harness/ports.py` | 10 个协议 + `PORT_PROTOCOLS` / `MODULE_PORTS` |
+| `agent_core/harness/ingest.py` | `DefaultIngestPort` |
+| `agent_core/harness/action.py` | `ToolActionPort` + 内存 / SQLite 审批队列 |
+| `agent_core/harness/state.py` | `SQLiteStatePort`（不依赖 langgraph） |
+| `agent_core/harness/verify.py` | `RuleVerifyPort` |
+| `agent_core/harness/audit.py` | `SQLiteAuditPort`（哈希链 / 查询 / 留存） |
+| `agent_core/harness/memory.py` | `StoreMemoryPort`（SQLite 存储 → 端口） |
+| `agent_core/harness/identity.py` | `StaticIdentityPort`（用户 / 智能体目录、过期、能力交集） |
+| `agent_core/harness/context.py` | `MemoryContextPort`（记忆 → 上下文块） |
+| `agent_core/harness/knowledge.py` | `SQLiteKnowledgePort`（入库 / 审核 / 检索 / 回取） |
+| `agent_core/harness/markdown_memory.py` | `MarkdownMemoryPort`（本地 Markdown 记忆） |
+| `agent_core/harness/markdown_knowledge.py` | `MarkdownKnowledgePort`（本地 Markdown 知识） |
+| `agent_core/harness/markdown_io.py` | frontmatter / 路径安全 / 原子写 |
+| `agent_core/harness/postgres_memory.py` | `PostgresMemoryPort` |
+| `agent_core/harness/postgres_knowledge.py` | `PostgresKnowledgePort` |
+| `agent_core/harness/postgres_state.py` | `PostgresStatePort` |
+| `agent_core/harness/postgres_audit.py` | `PostgresAuditPort` |
+| `agent_core/harness/pg.py` | psycopg 连接 / 行转 dict / 事务 |
+| `agent_core/harness/factory.py` | `build_local_ports`（sqlite / markdown / postgres） |
+| `agent_core/harness/write.py` | `check_record` / `write_record`（四态写入契约） |
+| `agent_core/harness/wiring.py` | `PortSet`（启动时检查 10 端口） |
+| `agent_core/context/metrics.py` | 上下文指标（注入 / 丢弃 / 缓存 / 预算 / 权威分布） |
+| `agent_core/api.py` | `AgentConfig` 可选端口：`audit` / `state_port` / `approval_queue` / `verify_port` |
+| `agent_core/executors.py` | 工具 / 审批 / 检查点 / 审计的实际调用点 |
+| `tests/test_harness_ports.py` | 20 项契约与默认实现用例 |
+| `tests/test_harness_agent_integration.py` | 5 项主循环接入用例（审计 / 检查点 / 审批 / 验收） |
+| `tests/test_harness_identity.py` | 8 项身份 / 过期 / 能力交集用例 |
+| `tests/test_harness_context_adapter.py` | 9 项记忆 → 上下文闭环用例 |
+| `tests/test_harness_knowledge.py` | 11 项知识入库 / 审核 / 检索用例 |
+| `tests/test_context_metrics.py` | 10 项指标用例 |
+| `tests/test_harness_markdown.py` | 16 项 Markdown 记忆 / 知识 / 工厂用例 |
+| `tests/test_harness_postgres.py` | 4 项 PostgreSQL 用例（无 DSN 跳过） |
+| `tests/e2e_harness_storage.py` | 三套后端 + Agent + 审批闭环端到端脚本 |
+
+已同步修掉的三处模型不一致：
+
+| 项 | 结果 |
+|---|---|
+| `KnowledgePort` 缺 `get_chunk` | 已补 |
+| `MemoryPort.upsert` 返回 `str` vs `dict` | 统一 `WriteResult`（append / supersede / noop / invalid） |
+| 预算截断半段 / 指令段被截断 | 改为整块丢弃；`procedural` 超限直接 `ContextOverflow` |

@@ -1,0 +1,2 @@
+# PostgreSQL 后端可选依赖
+psycopg[binary]>=3.1

@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="880" viewBox="0 0 1200 880" role="img" aria-labelledby="title desc">
+  <title id="title">agent-core 架构图</title>
+  <desc id="desc">agent-core 是宿主与存储之间的运行时治理内核：7 个模块、10 个端口、3 套存储后端。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5B6B82"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F5DA8"/>
+    </marker>
+    <style><![CDATA[
+      text { font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #1B2430; }
+      .title { font-size: 30px; font-weight: 700; }
+      .sub { font-size: 15px; fill: #4B5563; }
+      .band-label { font-size: 14px; font-weight: 700; }
+      .band-note { font-size: 12px; fill: #4B5563; }
+      .box-title { font-size: 16px; font-weight: 700; }
+      .port { font-size: 13px; font-weight: 700; fill: #2F5DA8; }
+      .desc { font-size: 12px; fill: #4B5563; }
+      .small { font-size: 11px; fill: #6B7280; }
+      .chip { font-size: 13px; font-weight: 600; }
+      .footer { font-size: 11px; fill: #6B7280; }
+      .arrow-label { font-size: 11px; fill: #2F5DA8; }
+    ]]></style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="880" fill="#F7F9FC"/>
+
+  <text x="40" y="48" class="title">agent-core · 可复用、可治理的智能体内核</text>
+  <text x="40" y="74" class="sub">宿主只实现业务；身份、上下文、工具、状态、审计由内核统一治理</text>
+
+  <!-- 宿主层 -->
+  <rect x="40" y="96" width="1120" height="78" rx="12" fill="#E8EEF9" stroke="#B9C7E6"/>
+  <text x="60" y="122" class="band-label">宿主 / 业务层</text>
+  <text x="60" y="142" class="band-note">模型 · 存储 · 权限 · 工具全部由宿主注入</text>
+  <rect x="470" y="110" width="200" height="50" rx="8" fill="#FFFFFF" stroke="#B9C7E6"/>
+  <text x="570" y="132" text-anchor="middle" class="box-title">SaaS 产品</text>
+  <text x="570" y="150" text-anchor="middle" class="small">多租户 / 多智能体</text>
+  <rect x="690" y="110" width="200" height="50" rx="8" fill="#FFFFFF" stroke="#B9C7E6"/>
+  <text x="790" y="132" text-anchor="middle" class="box-title">内部平台</text>
+  <text x="790" y="150" text-anchor="middle" class="small">审批 / 审计 / 隔离</text>
+  <rect x="910" y="110" width="200" height="50" rx="8" fill="#FFFFFF" stroke="#B9C7E6"/>
+  <text x="1010" y="132" text-anchor="middle" class="box-title">自定义宿主</text>
+  <text x="1010" y="150" text-anchor="middle" class="small">只实现需要的端口</text>
+
+  <line x1="600" y1="174" x2="600" y2="188" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Harness 内核 -->
+  <rect x="40" y="190" width="1120" height="430" rx="14" fill="#FFFFFF" stroke="#2F5DA8" stroke-width="2"/>
+  <text x="60" y="220" class="band-label">agent-core · Harness（运行时治理外壳）</text>
+  <text x="1140" y="220" text-anchor="end" class="band-note">7 个模块 / 10 个端口</text>
+
+  <!-- 第一行：定义 / 观测 / 上下文 / 控制 -->
+  <rect x="60" y="240" width="245" height="120" rx="10" fill="#E3F0FF" stroke="#4A7BC8"/>
+  <text x="78" y="268" class="box-title">定义层</text>
+  <text x="78" y="292" class="port">IdentityPort</text>
+  <text x="78" y="314" class="desc">身份事实 · 只读</text>
+  <text x="78" y="332" class="desc">不从对话推断</text>
+
+  <rect x="325" y="240" width="245" height="120" rx="10" fill="#E8F7EE" stroke="#3D9A5B"/>
+  <text x="343" y="268" class="box-title">观测</text>
+  <text x="343" y="292" class="port">IngestPort</text>
+  <text x="343" y="314" class="desc">用户输入 · 工具结果</text>
+  <text x="343" y="332" class="desc">事件与附件指针</text>
+
+  <rect x="590" y="240" width="245" height="120" rx="10" fill="#FFF4E5" stroke="#D98A1C"/>
+  <text x="608" y="268" class="box-title">上下文</text>
+  <text x="608" y="292" class="port">ContextPort · MemoryPort</text>
+  <text x="608" y="314" class="port">KnowledgePort</text>
+  <text x="608" y="332" class="desc">选择 → 预算 → 拼装</text>
+
+  <rect x="855" y="240" width="245" height="120" rx="10" fill="#F3E8FF" stroke="#7A4BC2"/>
+  <text x="873" y="268" class="box-title">控制</text>
+  <text x="873" y="292" class="port">ModelPort</text>
+  <text x="873" y="314" class="desc">模型调用 · 规划</text>
+  <text x="873" y="332" class="desc">压缩 · 预算</text>
+
+  <line x1="305" y1="300" x2="323" y2="300" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="570" y1="300" x2="588" y2="300" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="835" y1="300" x2="853" y2="300" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 第二行：动作 / 状态 / 验收 -->
+  <rect x="60" y="400" width="340" height="130" rx="10" fill="#FFE8E8" stroke="#C24A4A"/>
+  <text x="78" y="428" class="box-title">动作</text>
+  <text x="78" y="452" class="port">ActionPort · AccessPolicyPort</text>
+  <text x="78" y="474" class="desc">工具可见性 · 审批 · 执行</text>
+  <text x="78" y="492" class="desc">租户 / 角色 / scope 过滤，默认拒绝</text>
+
+  <rect x="430" y="400" width="340" height="130" rx="10" fill="#E6F7F8" stroke="#2A8C93"/>
+  <text x="448" y="428" class="box-title">状态</text>
+  <text x="448" y="452" class="port">StatePort</text>
+  <text x="448" y="474" class="desc">运行状态 · 检查点</text>
+  <text x="448" y="492" class="desc">start / tool / approval / done</text>
+
+  <rect x="800" y="400" width="340" height="130" rx="10" fill="#FFF9DB" stroke="#B7950B"/>
+  <text x="818" y="428" class="box-title">验收</text>
+  <text x="818" y="452" class="port">VerifyPort · AuditPort</text>
+  <text x="818" y="474" class="desc">结果验收 · 哈希链审计</text>
+  <text x="818" y="492" class="desc">只追加 · 可校验 · 可留存</text>
+
+  <path d="M 977 360 C 977 382, 230 382, 230 398" fill="none" stroke="#2F5DA8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrowBlue)"/>
+  <text x="500" y="386" class="arrow-label">模型输出 → 动作</text>
+  <line x1="400" y1="465" x2="428" y2="465" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="770" y1="465" x2="798" y2="465" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 回流闭环 -->
+  <path d="M 1140 465 H 1170 V 230 H 712 V 238" fill="none" stroke="#2F5DA8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrowBlue)"/>
+  <text x="900" y="226" class="arrow-label">审计 / 回流下一轮</text>
+
+  <text x="60" y="590" class="small">实线：主链路　·　虚线：审计 / 回流　·　执行器：React / Graph / Hybrid　·　运行状态：可取消 / 可恢复 / 可审批</text>
+
+  <!-- 存储后端 -->
+  <line x1="230" y1="620" x2="230" y2="648" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="600" y1="620" x2="600" y2="648" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="970" y1="620" x2="970" y2="648" stroke="#5B6B82" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="40" y="650" width="1120" height="100" rx="12" fill="#EEF2F7" stroke="#C9D6E8"/>
+  <text x="60" y="675" class="band-label">存储后端（同一套契约，按部署形态切换）</text>
+  <rect x="60" y="690" width="340" height="44" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+  <text x="230" y="708" text-anchor="middle" class="box-title">SQLite</text>
+  <text x="230" y="726" text-anchor="middle" class="small">默认 · 单机 · 标准库</text>
+  <rect x="430" y="690" width="340" height="44" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+  <text x="600" y="708" text-anchor="middle" class="box-title">Markdown</text>
+  <text x="600" y="726" text-anchor="middle" class="small">人可读写 · 改正文自动退回审核</text>
+  <rect x="800" y="690" width="340" height="44" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+  <text x="970" y="708" text-anchor="middle" class="box-title">PostgreSQL</text>
+  <text x="970" y="726" text-anchor="middle" class="small">多副本 · 并发写 · 行级/咨询锁</text>
+
+  <!-- 优势条 -->
+  <g>
+    <rect x="50" y="775" width="175" height="46" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+    <text x="137" y="803" text-anchor="middle" class="chip">10 个治理端口</text>
+    <rect x="235" y="775" width="175" height="46" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+    <text x="322" y="803" text-anchor="middle" class="chip">3 套存储后端</text>
+    <rect x="420" y="775" width="175" height="46" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+    <text x="507" y="803" text-anchor="middle" class="chip">3 种执行器</text>
+    <rect x="605" y="775" width="175" height="46" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+    <text x="692" y="803" text-anchor="middle" class="chip">审批可恢复</text>
+    <rect x="790" y="775" width="175" height="46" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+    <text x="877" y="803" text-anchor="middle" class="chip">审计哈希链</text>
+    <rect x="975" y="775" width="175" height="46" rx="8" fill="#FFFFFF" stroke="#C9D6E8"/>
+    <text x="1062" y="803" text-anchor="middle" class="chip">租户 / 角色隔离</text>
+  </g>
+
+  <text x="40" y="855" class="footer">273 tests · Apache-2.0 · Python 3.10+ · SQLite / Markdown / PostgreSQL</text>
+</svg>
