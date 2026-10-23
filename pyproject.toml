@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-core"
-version = "1.1.1"
+dynamic = ["version"]
 description = "可复用智能体内核：LangGraph 执行器、工具/权限/压缩/hooks/子代理，以及多智能体模块 API"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -30,3 +30,7 @@ postgres = ["psycopg[binary]>=3.1"]
 [tool.setuptools.packages.find]
 # 只打包 agent_core；app/、web/、tests/、skills/ 属于宿主或测试资产，不进入库
 include = ["agent_core*"]
+
+[tool.setuptools.dynamic]
+# 版本单一来源：agent_core/_version.py；避免 __version__ 与发行元数据漂移
+version = { attr = "agent_core._version.__version__" }

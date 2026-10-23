@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-__version__ = "1.1.0"
+from ._version import __version__
 
 # 契约与错误
 from .contracts import (Approver, EventSink, MemoryProvider, Policy, PolicyDecision,

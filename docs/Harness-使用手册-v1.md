@@ -392,6 +392,16 @@ E2E_OK approval_loop
 E2E_ALL_OK sqlite,markdown,postgres
 ```
 
+版本核对（宿主健康检查可直接用 `agent_core.__version__`）：
+
+```bash
+python -c "import agent_core, importlib.metadata as m; print(agent_core.__version__, m.version('agent-core'))"
+# 1.1.2 1.1.2
+```
+
+两者不一致只可能是装了旧 wheel；版本号唯一来源是 `agent_core/_version.py`，
+`tests/test_version.py` 会拦住漂移。
+
 ---
 
 ## 9. 故障排查

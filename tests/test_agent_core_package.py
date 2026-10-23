@@ -51,7 +51,8 @@ class PackageBoundaryTests(unittest.TestCase):
 
     def test_import_and_public_api(self):
         import agent_core
-        self.assertEqual(agent_core.__version__, "1.1.0")
+        from agent_core._version import __version__
+        self.assertEqual(agent_core.__version__, __version__)
         for name in ("Agent", "AgentService", "ToolRegistry", "RulePolicy",
                      "HookManager", "Tracer", "ContextManager", "PromptRegistry",
                      "SessionManager", "SkillLibrary", "SubagentRunner",
