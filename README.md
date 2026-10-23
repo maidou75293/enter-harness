@@ -42,7 +42,7 @@ result = agent.run(RunRequest(objective="分析本周销售数据"))
 | 可恢复 | 运行状态与检查点（start / tool / approval / done），失败可续跑 |
 | 可横向扩展 | PostgreSQL 后端 + 部分唯一索引 + advisory lock，多副本并发写不撞车 |
 | 可替换、不被绑定 | 模型、存储、权限、事件全部端口化；换模型 / 换库不改业务代码 |
-| 可验证 | 311 项单元测试 + 三后端端到端（含审批闭环），发版有基线 |
+| 可验证 | 316 项单元测试 + 三后端端到端（含审批闭环），发版有基线 |
 
 ---
 
@@ -137,7 +137,10 @@ ports = build_local_ports("/data/agent", backend="postgres",    # 多副本
 - `ToolSpec` 统一描述 `risk` / `side_effect` / `approval` / `danger` / `parallel`；
 - 注册期校验工具名、JSON Schema、字段类型，坏工具启动即失败；
 - 审批支持 `needs_approval` → 落单 → `resume`，同一审批单重复恢复不会重复执行；
-- 工具调用、审批、验收、运行开始 / 结束全部可写审计。
+- 工具调用、审批、验收、运行开始 / 结束全部可写审计；
+- `action_mode="port"` 时，工具清单与执行改走 `ActionPort`：
+  可见性过滤、策略 allow / ask / deny、审批单与审计统一由端口负责，
+  默认 `legacy` 行为不变。
 
 ### 7. 审计与合规：只追加 + 哈希链
 
@@ -165,7 +168,7 @@ ports = build_local_ports("/data/agent", backend="postgres",    # 多副本
 
 ### 10. 可验证
 
-- 311 项单元测试（公开仓基线；本地含旧宿主测试时为 316）；
+- 316 项单元测试（公开仓基线；本地含旧宿主测试时为 321）；
 - 存储端到端覆盖 SQLite / Markdown / PostgreSQL，并串起
   记忆 → 上下文 → 知识审核 → 检查点 → 审计链 → Agent 运行 → 审批闭环；
 - PostgreSQL 用例在未设 `HARNESS_PG_DSN` 时自动跳过，不拖累本地开发；
@@ -203,7 +206,7 @@ flowchart LR
 
 ```bash
 # 从 GitHub 安装（带 PostgreSQL 后端）
-pip install "enter-harness[postgres] @ git+https://github.com/maidou75293/enter-harness.git@v1.2.0"
+pip install "enter-harness[postgres] @ git+https://github.com/maidou75293/enter-harness.git@v1.3.0"
 
 # 或本地开发
 pip install -e /path/to/enter-harness

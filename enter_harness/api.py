@@ -68,6 +68,10 @@ class AgentConfig:
     approval_queue: Any | None = None
     verify_port: Any | None = None
     verify_criteria: dict | None = None
+    # 动作链路：legacy = 旧的 registry+policy 内置流程；
+    # port = 工具清单与执行都走 ActionPort（可见性/策略/审批/审计由端口负责）
+    action_port: Any | None = None
+    action_mode: str = "legacy"
 
 
 class Agent:
@@ -82,6 +86,10 @@ class Agent:
             raise ConfigError("缺少 store 端口")
         if config.executor not in ("auto", "react", "graph", "hybrid"):
             raise ConfigError(f"未知 executor：{config.executor}")
+        if config.action_mode not in ("legacy", "port"):
+            raise ConfigError(f"未知 action_mode：{config.action_mode}")
+        if config.action_mode == "port" and config.action_port is None:
+            raise ConfigError("action_mode='port' 需要同时提供 action_port")
         self.config = config
         self.scope = config.scope
         self.model = config.model
@@ -122,6 +130,13 @@ class Agent:
                 return "hybrid"
             return "graph"
         return "react"
+
+    def _identity(self) -> dict:
+        """把 Scope 映射成 ActionPort 需要的身份事实（只读，不从对话推断）。"""
+        s = self.scope
+        return {"tenant_id": s.tenant_id, "agent_id": s.agent_id,
+                "user_id": s.user_id, "roles": list(s.role_ids or ()),
+                "session_id": str((self.config.metadata or {}).get("session_id") or "")}
 
     def _build_context(self, req: RunRequest) -> RunContext:
         if not str(req.objective or "").strip():
@@ -261,6 +276,10 @@ class Agent:
         event_sink = sink or self.events
         ctx.metadata.update({"model": self.model, "policy": self.policy,
                              "hooks": hooks, "event_sink": event_sink})
+        if self.config.action_mode == "port":
+            ctx.metadata.update({"action_mode": "port",
+                                 "action_port": self.config.action_port,
+                                 "identity": self._identity()})
         self._apply_resume(ctx, req)
         self._audit(ctx, "run:start", ctx.objective, "start")
         self._checkpoint(ctx, "start", {

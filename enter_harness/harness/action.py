@@ -39,6 +39,25 @@ _TOOL_FIELDS = ("name", "description", "parameters", "danger", "source", "tags",
                 "risk", "side_effect", "approval")
 
 
+def _field(verdict: Any, name: str, default: Any = "") -> Any:
+    """策略返回值可能是 dict 或对象；统一取字段。"""
+    if isinstance(verdict, dict):
+        return verdict.get(name, default)
+    return getattr(verdict, name, default)
+
+
+def _decision_of(verdict: Any) -> str:
+    """策略返回值统一成 allow / ask / deny；未知值按 ask（默认不放行）。"""
+    if verdict is None:
+        return "allow"
+    raw = (verdict.get("decision") if isinstance(verdict, dict)
+           else getattr(verdict, "decision", "allow"))
+    text = str(raw or "allow").strip().lower()
+    if text == "needs_approval":
+        return "ask"
+    return text if text in ("allow", "ask", "deny") else "ask"
+
+
 def _tool_dict(tool: Any) -> dict | None:
     """把 dict / FunctionTool / 任意带同名字段的对象统一成 dict。
 
@@ -202,12 +221,17 @@ class SQLiteApprovalQueue:
 
 
 class ToolActionPort:
-    """把 ToolRegistry 适配成 ActionPort。"""
+    """把 ToolRegistry 适配成 ActionPort。
 
-    def __init__(self, registry, *, queue=None, audit=None):
+    可选 `policy`（`ToolPolicyPort`）：传入后 `call` 会先做 allow/ask/deny 判定，
+    `ask` 返回 `status="needs_approval"` 并带 `approval_id`，由宿主落单与恢复。
+    """
+
+    def __init__(self, registry, *, queue=None, audit=None, policy=None):
         self.registry = registry
         self.queue = queue or InMemoryApprovalQueue()
         self.audit = audit
+        self.policy = policy
 
     # ------------------------------------------------------------ 清单
     def list_tools(self, identity: dict, scope: str = "") -> Sequence[dict]:
@@ -286,6 +310,25 @@ class ToolActionPort:
                 return ActionResult(
                     ok=False, status="denied", error=denied,
                     meta={"tool": name, "args": args, "ctx": ctx})
+            if self.policy is not None:
+                verdict = self.policy.check(ctx, {"tool": name, "args": args})
+                decision = _decision_of(verdict)
+                reason = str(_field(verdict, "reason") or "")
+                if decision == "deny":
+                    self._audit(ident, f"tool:{name}", name, "denied", reason,
+                                str(context.get("run") or ""))
+                    return ActionResult(ok=False, status="denied",
+                                        error=reason or "权限拒绝",
+                                        meta={"tool": name, "args": args, "ctx": ctx})
+                if decision == "ask":
+                    approval_id = (str(_field(verdict, "approval_id") or "")
+                                   or "ap_" + uuid.uuid4().hex[:12])
+                    prompt = reason or f"工具 {name} 需要审批"
+                    self._audit(ident, f"approval:{name}", name, "pending", prompt,
+                                str(context.get("run") or ""))
+                    return ActionResult(ok=False, status="needs_approval",
+                                        error=prompt, approval_id=approval_id,
+                                        meta={"tool": name, "args": args, "ctx": ctx})
         try:
             raw = self.registry.execute(name, dict(args or {}), context)
             if inspect.isawaitable(raw):

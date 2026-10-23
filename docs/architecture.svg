@@ -142,5 +142,5 @@
     <text x="1062" y="803" text-anchor="middle" class="chip">租户 / 角色隔离</text>
   </g>
 
-  <text x="40" y="855" class="footer">311 tests · Apache-2.0 · Python 3.10+ · SQLite / Markdown / PostgreSQL</text>
+  <text x="40" y="855" class="footer">316 tests · Apache-2.0 · Python 3.10+ · SQLite / Markdown / PostgreSQL</text>
 </svg>

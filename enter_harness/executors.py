@@ -137,8 +137,20 @@ class _LangToolBus:
         self.ctx = ctx
         self.state = state
         self.hooks = hooks
+        meta = ctx.metadata or {}
+        # action_mode="port"：清单与执行都走 ActionPort（可见性/策略/审批/审计）
+        self.action_port = meta.get("action_port")
+        self.action_mode = str(meta.get("action_mode") or "legacy")
+        self.identity = dict(meta.get("identity") or {})
+        self.tool_scope = str(meta.get("tool_scope") or "")
 
     def list_tools(self):
+        if self.action_mode == "port" and self.action_port is not None:
+            tools = self.action_port.list_tools(self.identity, self.tool_scope)
+            allowed = set(self.ctx.tool_whitelist or ())
+            return [{"name": t["name"], "description": t.get("description", ""),
+                     "parameters": t.get("parameters") or {"type": "object"}}
+                    for t in tools if not allowed or t["name"] in allowed]
         return [{"name": t.name, "description": t.description,
                  "parameters": t.parameters}
                 for t in self.registry.list_tools(self.ctx.tool_whitelist or None)]
@@ -153,6 +165,8 @@ class _LangToolBus:
         if self.ctx.tool_whitelist and name not in self.ctx.tool_whitelist:
             self._audit(f"tool:{name}", name, "denied", "不在工具白名单")
             return {"ok": False, "error": f"工具不在白名单：{name}"}
+        if self.action_mode == "port" and self.action_port is not None:
+            return await self._execute_port(name, args)
         policy = (self.ctx.metadata or {}).get("policy")
         if policy is not None:
             d = policy.check(self.ctx, {"tool": name, "args": args})
@@ -204,6 +218,42 @@ class _LangToolBus:
             self.hooks.after_tool_batch(self.ctx, self.state)
             self._maybe_pressure()
         return {"ok": res.ok, "result": res.content, "error": res.error}
+
+    async def _execute_port(self, name: str, args: dict) -> dict:
+        """执行走 ActionPort：可见性、策略、审批、审计都由端口负责。"""
+        res = await self.action_port.call(self.identity, name, args, self.ctx)
+        status = str(getattr(res, "status", "") or "")
+        if status == "ok":
+            content = res.result if isinstance(res.result, str) else str(
+                res.result if res.result is not None else "")
+            self.state.tool_results.append(ToolResult(
+                call_id="", name=name, ok=True, content=content))
+            self._checkpoint(f"tool:{name}", {
+                "tool": name, "args": args, "ok": True,
+                "step": self.state.step, "via": "port"})
+            if self.hooks:
+                self.hooks.after_tool_batch(self.ctx, self.state)
+                self._maybe_pressure()
+            return {"ok": True, "result": res.result}
+        error = str(getattr(res, "error", "") or "工具执行失败")
+        if status == "needs_approval":
+            approval_id = str(getattr(res, "approval_id", "") or "")
+            self.state.pending = PendingState(
+                kind="approval", prompt=error,
+                data={"tool": name, "args": args, "approval_id": approval_id})
+            self._queue_ticket(name, args, approval_id, error)
+            self._checkpoint(f"approval:{name}", {
+                "tool": name, "args": args, "ok": False,
+                "approval_id": approval_id, "reason": "pending", "via": "port"})
+            return {"ok": False, "needs_approval": True,
+                    "approval_id": approval_id, "error": error}
+        denied = status == "denied"
+        self.state.tool_results.append(ToolResult(
+            call_id="", name=name, ok=False, content="", error=error))
+        self._checkpoint(f"tool:{name}", {
+            "tool": name, "args": args, "ok": False,
+            "error": error, "step": self.state.step, "via": "port"})
+        return {"ok": False, **({"denied": True} if denied else {}), "error": error}
 
     # ------------------------------------------------------------ 审批 / 观测
     @staticmethod
