@@ -51,30 +51,61 @@ _END = object()
 
 
 def _iter_sync(make_agen) -> Iterator[Any]:
-    """把异步生成器变成同步生成器：后台线程跑事件循环，队列转发。"""
-    q: queue.Queue = queue.Queue()
+    """把异步生成器变成同步生成器：后台线程跑事件循环，队列转发。
+
+    消费方提前关闭（SSE 断连 / break）时，通过 stop 事件让生产端退出并
+    `aclose()` 异步生成器，避免后台线程、HTTP 流与队列继续泄漏。
+    """
+    q: queue.Queue = queue.Queue(maxsize=128)
+    stop = threading.Event()
     ctx = contextvars.copy_context()
+
+    def put(item) -> bool:
+        while not stop.is_set():
+            try:
+                q.put(item, timeout=0.05)
+                return True
+            except queue.Full:
+                continue
+        return False
 
     def run():
         async def pump():
+            agen = make_agen()
             try:
-                async for item in make_agen():
-                    q.put(item)
+                async for item in agen:
+                    if stop.is_set() or not put(item):
+                        break
             except BaseException as e:  # noqa: BLE001 —— 在消费方原样抛出
-                q.put(e)
+                put(e)
             finally:
-                q.put(_END)
+                put(_END)
+                close = getattr(agen, "aclose", None)
+                if callable(close):
+                    try:
+                        await close()
+                    except Exception:  # noqa: BLE001 —— 关闭失败不影响消费方
+                        pass
 
         ctx.run(asyncio.run, pump())
 
     threading.Thread(target=run, daemon=True).start()
-    while True:
-        item = q.get()
-        if item is _END:
-            return
-        if isinstance(item, BaseException):
-            raise item
-        yield item
+    try:
+        while True:
+            item = q.get()
+            if item is _END:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+    finally:
+        stop.set()
+        # 清空队列，唤醒可能阻塞在 put() 的生产端
+        try:
+            while True:
+                q.get_nowait()
+        except queue.Empty:
+            pass
 
 
 def _message_dict(m) -> dict:

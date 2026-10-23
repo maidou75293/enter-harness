@@ -89,7 +89,7 @@ class SQLiteKnowledgePort:
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------ 写入
-    def add(self, chunk: dict) -> str:
+    def add(self, chunk: dict, preserve_status: bool = False) -> str:
         """写入或更新一个知识块，返回块 id。
 
         必填 content、source；缺任一或为空白字符串时抛 ValueError。
@@ -135,7 +135,9 @@ class SQLiteKnowledgePort:
             if review_status not in _REVIEW_STATUSES:
                 raise ValueError(f"非法 review_status: {review_status}")
 
-            created_at = float(existing["created_at"]) if existing is not None else now
+            created_at = (float(existing["created_at"]) if existing is not None
+                          else float(chunk.get("created_at") or now))
+            updated_at = float(chunk.get("updated_at") or now)
 
             # 版本 = 来源时间 + 内容指纹；缺少来源时间用入库时间兜底
             source_time = chunk.get("source_time")
@@ -166,7 +168,8 @@ class SQLiteKnowledgePort:
                 " reviewer=excluded.reviewer",
                 (chunk_id, pick("tenant_id"), pick("scope"), pick("scope_id"),
                  pick("doc_id"), pick("title"), source, content, content_hash,
-                 review_status, version, created_at, now, pick("reviewer")))
+                 review_status, version, created_at, updated_at,
+                 pick("reviewer")))
         return chunk_id
 
     def approve(self, chunk_id: str, reviewer: str = "") -> bool:
@@ -262,6 +265,21 @@ class SQLiteKnowledgePort:
             args.append(str(tenant_id))
         row = self.conn.execute(sql, args).fetchone()
         return self._dict(row) if row is not None else None
+
+    def dump(self, tenant_id: str = "") -> list[dict]:
+        """导出某租户的全部知识块（含 pending / rejected / archived）。
+
+        字段与 add() 接受的 chunk dict 对齐，可直接回灌到其它后端；
+        只含纯数据，不含连接对象。
+        """
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT id, tenant_id, scope, scope_id, doc_id, title, source,"
+                " content, content_hash, review_status, version, created_at,"
+                " updated_at, reviewer FROM knowledge_chunk"
+                " WHERE tenant_id=? ORDER BY created_at, id",
+                (str(tenant_id or ""),)).fetchall()
+        return [{key: row[key] for key in row.keys()} for row in rows]
 
     def close(self) -> None:
         with self._lock:

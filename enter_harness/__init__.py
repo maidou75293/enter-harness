@@ -27,10 +27,10 @@ from .settings import DictSettings, as_settings
 from .tracing import Tracer
 
 # LLM / 记忆 / 会话 / 技能
-from .llm import (OpenAICompatModel, ProviderModelPort, build_model,
-                  build_provider, create_model, create_provider, extract_json,
-                  get_profile, list_providers, register_provider, tool_result,
-                  unregister_provider)
+from .llm import (AnthropicCompatModel, OpenAICompatModel, ProviderModelPort,
+                  build_model, build_provider, create_model, create_provider,
+                  extract_json, get_profile, list_providers, register_provider,
+                  tool_result, unregister_provider)
 from .memory import Memory
 from .session import SessionManager
 from .skills import SkillLibrary
@@ -43,8 +43,9 @@ from .context import (AccessPolicyPort, Block, BlockCache, BlockMeta,
                       KnowledgePort, MemoryPort, MemoryRecord, MetricsRegistry,
                       SQLiteMemoryStore, assemble, derive_authority,
                       select_records, summarize)
+from .observability import OtelEventSink
 from .subagent import SubagentRunner
-from .tools import OutputLimiter, land_output, safe_path
+from .tools import OutputLimiter, ToolCatalog, land_output, safe_path
 
 # 内核端口（7 模块 / 10 端口）
 from .harness import (ActionResult, ApprovalTicket, AuditEvent, AuditPort,
@@ -56,6 +57,7 @@ from .harness import (ActionResult, ApprovalTicket, AuditEvent, AuditPort,
                       PostgresStatePort, RawInput, RuleVerifyPort,
                       SQLiteApprovalQueue, SQLiteAuditPort, SQLiteAuditSink,
                       SQLiteKnowledgePort, SQLiteStatePort, StatePort,
+                      dump_ports, load_ports, migrate_ports,
                       StaticIdentityPort, StoreMemoryPort, ToolActionPort,
                       Verdict, VerifyPort, build_local_ports, write_record)
 
@@ -94,12 +96,14 @@ __all__ = [
     "DictSettings", "as_settings", "bind", "current_tenant", "current_session",
     "current_run", "current_depth",
     # llm / memory / session / skills
-    "OpenAICompatModel", "ProviderModelPort", "build_model", "build_provider",
+    "OpenAICompatModel", "AnthropicCompatModel", "ProviderModelPort",
+    "build_model", "build_provider",
     "create_model", "create_provider", "register_provider", "unregister_provider",
     "list_providers", "get_profile", "extract_json",
     "tool_result", "Memory", "SessionManager", "SkillLibrary",
     # tools / context / loop / subagent
-    "ToolRegistry", "OutputLimiter", "land_output", "safe_path",
+    "ToolRegistry", "ToolCatalog", "OutputLimiter", "land_output", "safe_path",
+    "OtelEventSink",
     "ContextManager", "SubagentRunner",
     # 统一记忆/上下文模型（v1.3）
     "assemble", "BlockCache", "Block", "BlockMeta", "MemoryRecord",
@@ -115,6 +119,7 @@ __all__ = [
     "MarkdownKnowledgePort", "PostgresMemoryPort", "PostgresKnowledgePort",
     "PostgresStatePort", "PostgresAuditPort", "LocalPorts",
     "build_local_ports", "StaticIdentityPort", "ToolActionPort",
+    "migrate_ports", "dump_ports", "load_ports",
     "InMemoryApprovalQueue", "SQLiteApprovalQueue", "SQLiteStatePort",
     "SQLiteAuditPort", "SQLiteAuditSink", "RuleVerifyPort", "write_record",
     # v1.1 frozen API

@@ -102,6 +102,12 @@ class MarkdownMemoryPort:
                     count += 1
         return count
 
+    def dump(self, tenant_id: str = "") -> list[dict]:
+        """导出某租户的 active 记忆为纯数据（可 JSON 序列化）。"""
+        rows = self.query({"tenant_id": str(tenant_id or ""),
+                           "status": "active", "include_expired": True})
+        return [asdict(rec) for rec in rows]
+
     # ------------------------------------------------------------ 辅助
     def get(self, mid: str) -> MemoryRecord | None:
         for rec in self._scan(tenant_id=None):

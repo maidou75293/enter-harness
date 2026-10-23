@@ -9,6 +9,7 @@ CORE = ROOT / "enter_harness"
 ALLOWED_THIRD_PARTY = {
     "fastapi", "uvicorn", "langgraph", "langchain_core", "langchain",
     "mcp", "httpx", "pydantic", "multipart", "pypdf", "psycopg",
+    "opentelemetry",
 }
 
 

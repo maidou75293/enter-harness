@@ -170,14 +170,18 @@ class _LangToolBus:
         policy = (self.ctx.metadata or {}).get("policy")
         if policy is not None:
             d = policy.check(self.ctx, {"tool": name, "args": args})
-            decision = getattr(d, "decision", "allow")
-            reason = getattr(d, "reason", "")
+            decision = (d.get("decision") if isinstance(d, dict)
+                        else getattr(d, "decision", "allow"))
+            decision = "ask" if str(decision or "").lower() == "needs_approval" else decision
+            reason = (d.get("reason") if isinstance(d, dict)
+                      else getattr(d, "reason", "")) or ""
             if decision == "deny":
                 self._audit(f"tool:{name}", name, "denied", reason or "权限拒绝")
                 return {"ok": False, "denied": True,
                         "error": reason or "权限拒绝"}
             if decision == "ask":
-                approval_id = str(getattr(d, "approval_id", "") or "")
+                approval_id = str((d.get("approval_id") if isinstance(d, dict)
+                                   else getattr(d, "approval_id", "")) or "")
                 pending = dict((self.ctx.metadata or {}).get("approval_decision")
                                or {})
                 if self._matches(pending, name, args, approval_id):

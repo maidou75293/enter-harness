@@ -39,10 +39,67 @@ result = agent.run(RunRequest(objective="分析本周销售数据"))
 | 多租户隔离 | `Scope` 贯穿全链路；记忆 / 知识 / 工具都按租户过滤，跨租户默认拒绝 |
 | 权限与审批 | 工具三级可见性（租户 / 角色 / scope）+ `needs_approval` → 落单 → 幂等恢复 |
 | 可审计 | 审计只追加、带哈希链；改任何历史记录 `verify_chain()` 立刻断链 |
+| 记忆治理 | 六类记忆 + R1 唯一约束 + D1 确定性排序；规则块超限报错，绝不截断 |
 | 可恢复 | 运行状态与检查点（start / tool / approval / done），失败可续跑 |
 | 可横向扩展 | PostgreSQL 后端 + 部分唯一索引 + advisory lock，多副本并发写不撞车 |
 | 可替换、不被绑定 | 模型、存储、权限、事件全部端口化；换模型 / 换库不改业务代码 |
-| 可验证 | 316 项单元测试 + 三后端端到端（含审批闭环），发版有基线 |
+| 可验证 | 366 项单元测试 + 三后端端到端（含审批闭环），发版有基线 |
+
+---
+
+## 记忆与上下文：企业级记忆管理
+
+记忆不是「把聊天记录塞进 prompt」，而是**有身份、有范围、有权威、可审计的断言**。
+`enter-harness` 把这件事做成一套统一模型：写入有唯一约束，召回有固定次序，
+组装有预算和解释，换存储不改语义。
+
+### 六类记忆，各回答一个问题
+
+| 类型 | 回答什么 | 组装优先级 |
+|---|---|---|
+| `identity` 身份 | 这是谁、属于哪个租户 / 角色 | platform / tenant |
+| `profile` 画像 | 用户与项目的稳定偏好 | user → project → platform |
+| `semantic` 语义 | 稳定事实（库地址、口径、负责人） | project → platform → user |
+| `procedural` 流程 | 必须遵守的规则与流程 | platform → project → user |
+| `episodic` 情景 | 发生过什么（经验片段） | session → project |
+| `working` 工作 | 当前任务的临时状态 | session |
+
+一条记忆只表达一个可判断真假的断言，`key` 是它的稳定身份：同 key 新结论会
+`supersede` 旧结论，内容等价则 `noop`，不会越写越多、越写越乱。
+
+### 四条企业级保证
+
+1. **R1 唯一性**：同租户 / 范围 / 智能体 / 类型 / key / 条件只能有一条 `active`。
+   SQLite 用部分唯一索引，PostgreSQL 用部分唯一索引 + advisory lock，
+   并发写不会出现「两个真相」；Markdown 后端靠文件级约束与人审保证。
+2. **D1 确定性排序**：`procedural` 规则块永远排在事实之前，`project` 事实先于
+   `user` 画像，与 `select_records` 使用同一套 `scope_rank(kind, scope)`；
+   换执行器、换模型都不会改变记忆次序。
+3. **规则不截断**：上下文按块做预算，超限整块丢弃；`procedural` 块超限直接抛
+   `ContextOverflow`，绝不把「必须遵守的规则」切成半段。
+4. **可解释、可观测、可迁移**：`assemble()` 返回 `trace / used_chars / dropped`，
+   每个块为什么留下、为什么丢弃都有记录；`ContextMetrics` 可接监控；
+   记忆与知识可在 SQLite / Markdown / PostgreSQL 之间迁移，审计链保持同库连续。
+
+### 租户与隔离
+
+```python
+from enter_harness import MemoryRecord
+
+ports.memory.upsert(MemoryRecord(
+    tenant_id="t1", scope="project", scope_id="p1",
+    kind="semantic", key="项目库地址", content="10.0.0.5:3306",
+    source="user",
+))
+# 查询必须显式带 tenant_id；不带就只会查默认租户，不会跨租户
+rows = ports.memory.query({"tenant_id": "t1", "scope": "project",
+                           "scope_id": "p1"})
+```
+
+多租户 SaaS 里，这四条合起来意味着：**不同客户的数据不会串、同一事实不会分裂、
+规则不会被裁掉、每一次注入都能复盘**。
+
+详见 [核心模型：记忆 / 知识 / 上下文](docs/核心模型-记忆知识上下文-v1.md)。
 
 ---
 
@@ -168,13 +225,80 @@ ports = build_local_ports("/data/agent", backend="postgres",    # 多副本
 
 ### 10. 可验证
 
-- 316 项单元测试（公开仓基线；本地含旧宿主测试时为 321）；
+- 366 项单元测试（公开仓基线；本地含旧宿主测试时为 371）；
 - 存储端到端覆盖 SQLite / Markdown / PostgreSQL，并串起
   记忆 → 上下文 → 知识审核 → 检查点 → 审计链 → Agent 运行 → 审批闭环；
 - PostgreSQL 用例在未设 `HARNESS_PG_DSN` 时自动跳过，不拖累本地开发；
 - 版本号单一来源（`enter_harness/_version.py`）：`enter_harness.__version__`、
   `pyproject.toml`、已安装包的发行元数据三者同源，`tests/test_version.py` 守护；
   宿主可以直接用 `enter_harness.__version__` 打点，不必自己读 `importlib.metadata`。
+
+---
+
+## 工程化能力
+
+### 工具目录分层
+
+`ToolCatalog` 在治理型 `ToolRegistry` 之上按来源分层（`builtin` / `mcp` /
+`skill` / `subagent` / `host`），支持注册期配额与来源统计：
+
+```python
+from enter_harness import ToolCatalog
+
+catalog = ToolCatalog(quotas={"mcp": 20, "skill": 10})
+catalog.register("search", handler, source="mcp")
+catalog.counts()     # {"builtin": 0, "mcp": 1, ...}
+catalog.summary()    # total / counts / quotas
+```
+
+配额是注册期限制；热更新先 `unregister` 再 `register`。
+
+### 存储迁移
+
+三套后端之间可以导出/导入记忆与知识（审计链和运行状态不迁移）：
+
+```bash
+python -m enter_harness.harness.migrate   --from-backend sqlite --from-root /data/a   --to-backend postgres --to-dsn "$HARNESS_PG_DSN"
+```
+
+```python
+from enter_harness import build_local_ports, migrate_ports
+
+src = build_local_ports("/data/a", backend="sqlite")
+dst = build_local_ports("/data/b", backend="markdown")
+print(migrate_ports(src, dst, tenant_id="t1"))
+```
+
+记忆按 R1 唯一约束幂等，知识按 id 覆盖并保留审核状态。
+
+### 可观测性导出
+
+`OtelEventSink` 把运行事件转成 OpenTelemetry span；不装 `opentelemetry-api`
+也能 `import enter_harness`，只有真正创建 sink 时才要求依赖：
+
+```python
+from enter_harness import OtelEventSink
+
+AgentConfig(..., events=OtelEventSink())   # span 名 agent.<event.type>
+```
+
+`pip install 'enter-harness[otel]'`。
+
+### 任务级评测
+
+`enter_harness.eval` 用一组用例跑 Agent 并给出通过率，支持超时与异常判定：
+
+```python
+from enter_harness.eval import EvalCase, run_cases
+
+report = run_cases(
+    [EvalCase("hello", "打个招呼", expect_contains=("你好",))],
+    agent_factory=lambda case: build_agent(case),
+)
+print(report.passed, report.total, report.pass_rate)
+```
+
+离线自测：`python -m enter_harness.eval.runner --cases enter_harness/eval/cases.json`。
 
 ---
 
@@ -206,7 +330,7 @@ flowchart LR
 
 ```bash
 # 从 GitHub 安装（带 PostgreSQL 后端）
-pip install "enter-harness[postgres] @ git+https://github.com/maidou75293/enter-harness.git@v1.3.0"
+pip install "enter-harness[postgres] @ git+https://github.com/maidou75293/enter-harness.git@v1.4.0"
 
 # 或本地开发
 pip install -e /path/to/enter-harness
@@ -236,7 +360,19 @@ model = create_model("openai", base_url=..., api_key=..., name=...,
                      on_delta=lambda text: send_to_client(text))
 ```
 
-- 环境变量缺省：`OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`；
+内置 `anthropic` provider 走 Anthropic 原生 Messages API（不是 OpenAI 兼容层）：
+
+```python
+model = create_model("anthropic", api_key=os.environ["ANTHROPIC_API_KEY"],
+                     name="claude-sonnet-5-5")
+```
+
+消息里的 system / tool_use / tool_result 与工具 schema 会自动转换；流式同样支持
+`on_delta`，结束帧带 usage 与 finish_reason。Anthropic 不提供 embedding，
+`embed()` 会明确报错，需要时接 OpenAI 兼容嵌入或 `local_embed`。
+
+- 环境变量缺省：`OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`，
+  `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`；
 - 其他厂商或私有网关：`register_provider("my", factory)` 注册一个返回
   `async chat / complete` 对象的工厂，再用 `create_model("my", ...)`；
 - 多套模型配置：`build_model(settings)` 按 `models.profiles` 里的
@@ -301,9 +437,12 @@ AgentConfig(
 - [enter-harness 端口清单](docs/端口清单-v1.md)：10 个端口的契约与代码落点
 - [enter-harness 命名规范](docs/命名规范-v1.md)：端口 / 实现 / 类型 / 字段 / 状态枚举
 - [本地存储格式](docs/本地存储格式-v1.md)：SQLite / Markdown / PostgreSQL 的目录与表结构
+- [核心模型：记忆 / 知识 / 上下文](docs/核心模型-记忆知识上下文-v1.md)：断言模型、召回通道、组装规则
 - [enter-harness 设计](docs/enter-harness-设计.md)：模块划分、依赖方向、公开 API、迁移映射
 - [运行流水线](docs/核心模型-运行流水线-v1.md)：7 个模块、10 个端口、运行闭环
 - [多租户与沙箱](docs/多租户与沙箱.md)：租户隔离、权限与执行边界
+- [发布流程](docs/发布.md)：版本、构建、PyPI 与 tag
+- [变更记录](CHANGELOG.md)：逐版本变化
 
 ## 适用场景
 

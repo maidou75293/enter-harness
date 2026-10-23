@@ -14,8 +14,22 @@ import os
 import socket
 from pathlib import Path
 
-EGRESS_DIR = Path(os.environ.get("AGENT_CORE_EGRESS_DIR",
-                                 str(Path.home() / ".agent-core-egress")))
+def _default_dir() -> Path:
+    """新名优先；旧环境变量与旧目录仍兼容，避免升级后丢白名单。"""
+    explicit = os.environ.get("ENTER_HARNESS_EGRESS_DIR") or ""
+    if explicit:
+        return Path(explicit)
+    legacy = os.environ.get("AGENT_CORE_EGRESS_DIR") or ""
+    if legacy:
+        return Path(legacy)
+    new_dir = Path.home() / ".enter-harness-egress"
+    old_dir = Path.home() / ".agent-core-egress"
+    if old_dir.exists() and not new_dir.exists():
+        return old_dir
+    return new_dir
+
+
+EGRESS_DIR = _default_dir()
 
 
 def _resolve(domain: str) -> list:

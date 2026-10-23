@@ -120,6 +120,10 @@ class ToolRegistry:
     def specs(self) -> list:
         return [r.spec for r in self._tools.values() if r.spec.enabled]
 
+    def all_specs(self) -> list:
+        """全部已注册工具（含 ``enabled=False``），供配额与治理统计。"""
+        return [r.spec.to_dict() for r in self._tools.values()]
+
     def has(self, name: str) -> bool:
         return name in self._tools and self._tools[name].spec.enabled
 

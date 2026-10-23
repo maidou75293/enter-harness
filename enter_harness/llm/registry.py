@@ -4,6 +4,7 @@
 
 - 内置 `openai` / `openai-compatible`：任何 OpenAI 兼容接口
   （OpenAI、DeepSeek、通义、vLLM、Ollama、one-api 网关等）；
+- 内置 `anthropic` / `claude`：Anthropic 原生 Messages API；
 - 其他厂商/私有网关：`register_provider("my", factory)` 注册一个工厂，
   工厂返回实现 `contracts.Provider`（`async chat / complete`）的对象即可。
 
@@ -16,8 +17,9 @@ model = create_model("my", base_url=..., api_key=..., name="my-model")
 agent = Agent(AgentConfig(..., model=model))     # 已经是 ModelPort
 ```
 
-环境变量只在内置 `openai` 工厂里作为缺省值：
-`OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`。
+环境变量只在内置工厂里作为缺省值：
+`OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`，
+`ANTHROPIC_BASE_URL` / `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`。
 """
 from __future__ import annotations
 
@@ -27,6 +29,8 @@ import threading
 from typing import Any, Callable
 
 from ..errors import ConfigError
+from .anthropic_compat import AnthropicCompatModel
+from .anthropic_compat import DEFAULT_BASE_URL as ANTHROPIC_BASE_URL
 from .openai_compat import OpenAICompatModel
 from .sync_model import ProviderModelPort
 
@@ -100,5 +104,18 @@ def _openai_compatible(**options: Any) -> OpenAICompatModel:
     return OpenAICompatModel(base_url=base_url, api_key=api_key, name=name, **options)
 
 
+def _anthropic(**options: Any) -> AnthropicCompatModel:
+    """Anthropic 原生协议；缺省值可来自环境变量。"""
+    base_url = options.pop("base_url", None) or os.environ.get("ANTHROPIC_BASE_URL") \
+        or ANTHROPIC_BASE_URL
+    api_key = options.pop("api_key", None) or os.environ.get("ANTHROPIC_API_KEY", "")
+    name = options.pop("name", None) or os.environ.get("ANTHROPIC_MODEL", "")
+    # 这些是 OpenAI 兼容层的概念，Anthropic 不需要
+    options.pop("reasoning_effort", None)
+    return AnthropicCompatModel(base_url=base_url, api_key=api_key,
+                                name=name, **options)
+
+
 register_provider("openai", _openai_compatible,
                   aliases=("openai-compatible", "openai_compatible", "vllm", "ollama"))
+register_provider("anthropic", _anthropic, aliases=("claude",))

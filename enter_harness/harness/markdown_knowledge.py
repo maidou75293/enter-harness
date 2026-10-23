@@ -25,7 +25,7 @@ class MarkdownKnowledgePort:
         self._lock = threading.RLock()
 
     # ------------------------------------------------------------ 写
-    def add(self, chunk: dict) -> str:
+    def add(self, chunk: dict, preserve_status: bool = False) -> str:
         data = dict(chunk or {})
         content = str(data.get("content") or "").strip()
         source = str(data.get("source") or "").strip()
@@ -38,7 +38,7 @@ class MarkdownKnowledgePort:
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
         now = time.time()
         status = str(data.get("review_status") or "").strip().lower()
-        if old is not None:
+        if old is not None and not preserve_status:
             if digest == old.get("content_hash") and not status:
                 status = str(old.get("review_status") or "pending")
             elif not status or status == str(old.get("review_status") or ""):
@@ -58,7 +58,7 @@ class MarkdownKnowledgePort:
             "version": str(data.get("version") or ""),
             "created_at": float((old or {}).get("created_at")
                                 or data.get("created_at") or now),
-            "updated_at": now,
+            "updated_at": float(data.get("updated_at") or now),
             "reviewer": str(data.get("reviewer")
                             or (old or {}).get("reviewer") or ""),
             "content": content,
@@ -132,6 +132,33 @@ class MarkdownKnowledgePort:
                     return None
                 return rec
         return None
+
+    def dump(self, tenant_id: str = "") -> list[dict]:
+        """导出某租户的全部知识块（含 pending / rejected / archived）。
+
+        字段与 add() 接受的 chunk dict 对齐；丢弃内部编辑标记，
+        保证导出结果可 JSON 序列化、可回灌。
+        """
+        out = []
+        for rec in self._scan(tenant_id=str(tenant_id or "")):
+            out.append({
+                "id": str(rec.get("id") or ""),
+                "tenant_id": str(rec.get("tenant_id") or ""),
+                "scope": str(rec.get("scope") or ""),
+                "scope_id": str(rec.get("scope_id") or ""),
+                "doc_id": str(rec.get("doc_id") or ""),
+                "title": str(rec.get("title") or ""),
+                "source": str(rec.get("source") or ""),
+                "content": str(rec.get("content") or ""),
+                "content_hash": str(rec.get("content_hash") or ""),
+                "review_status": str(rec.get("review_status") or "pending"),
+                "version": str(rec.get("version") or ""),
+                "created_at": float(rec.get("created_at") or 0.0),
+                "updated_at": float(rec.get("updated_at") or 0.0),
+                "reviewer": str(rec.get("reviewer") or ""),
+            })
+        out.sort(key=lambda r: (r["created_at"], r["id"]))
+        return out
 
     # ------------------------------------------------------------ 内部
     def _path(self, rec: dict) -> Path:

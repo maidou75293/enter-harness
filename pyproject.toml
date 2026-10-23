@@ -9,12 +9,16 @@ description = "企业级智能体运行时内核：可替换模型/存储/权限
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
+keywords = ["agent", "llm", "runtime", "harness", "multi-tenant",
+            "audit", "approval", "langgraph"]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
     "langgraph>=1.0",
@@ -26,6 +30,13 @@ dependencies = [
 # 宿主自带的模型/存储适配器通常只需要上面三项；OCR/文档类能力按需引入
 ocr = ["pypdf>=6.0"]
 postgres = ["psycopg[binary]>=3.1"]
+otelemetry = ["opentelemetry-api>=1.20"]
+
+[project.urls]
+Homepage = "https://github.com/maidou75293/enter-harness"
+Repository = "https://github.com/maidou75293/enter-harness"
+Issues = "https://github.com/maidou75293/enter-harness/issues"
+Documentation = "https://github.com/maidou75293/enter-harness/blob/main/docs/使用手册-v1.md"
 
 [tool.setuptools.packages.find]
 # 只打包 enter_harness（含 agent_core 兼容层）；tests/ 等属于测试资产，不进入库

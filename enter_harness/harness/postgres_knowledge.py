@@ -41,7 +41,7 @@ class PostgresKnowledgePort:
         self.db.setup(SCHEMA)
 
     # ------------------------------------------------------------ 写
-    def add(self, chunk: dict) -> str:
+    def add(self, chunk: dict, preserve_status: bool = False) -> str:
         data = dict(chunk or {})
         content = str(data.get("content") or "").strip()
         source = str(data.get("source") or "").strip()
@@ -55,7 +55,7 @@ class PostgresKnowledgePort:
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
         now = time.time()
         status = str(data.get("review_status") or "").strip().lower()
-        if old is not None:
+        if old is not None and not preserve_status:
             if digest == old.get("content_hash") and not status:
                 status = str(old.get("review_status") or "pending")
             elif not status or status == str(old.get("review_status") or ""):
@@ -81,7 +81,8 @@ class PostgresKnowledgePort:
                 (cid, tenant_id, str(data.get("scope") or "project"),
                  str(data.get("scope_id") or ""), str(data.get("doc_id") or ""),
                  str(data.get("title") or ""), source, content, digest, status,
-                 str(data.get("version") or ""), created, now,
+                 str(data.get("version") or ""), created,
+                 float(data.get("updated_at") or now),
                  str(data.get("reviewer") or (old or {}).get("reviewer") or "")))
         return cid
 
@@ -156,6 +157,25 @@ class PostgresKnowledgePort:
         if row is None or row.get("review_status") == "archived":
             return None
         return row
+
+    def dump(self, tenant_id: str = "") -> list[dict]:
+        """导出某租户的全部知识块（含 pending / rejected / archived）。"""
+        rows = self.db.fetchall(
+            "SELECT id, tenant_id, scope, scope_id, doc_id, title, source,"
+            " content, content_hash, review_status, version, created_at,"
+            " updated_at, reviewer FROM harness_knowledge_chunk"
+            " WHERE tenant_id=%s ORDER BY created_at, id",
+            (str(tenant_id or ""),))
+        out = []
+        for row in rows:
+            item = {key: row.get(key) for key in (
+                "id", "tenant_id", "scope", "scope_id", "doc_id", "title",
+                "source", "content", "content_hash", "review_status", "version",
+                "created_at", "updated_at", "reviewer")}
+            item["created_at"] = float(item.get("created_at") or 0.0)
+            item["updated_at"] = float(item.get("updated_at") or 0.0)
+            out.append(item)
+        return out
 
     def close(self) -> None:
         self.db.close()

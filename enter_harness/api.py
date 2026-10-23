@@ -104,6 +104,7 @@ class Agent:
         self.hooks = config.hooks or MemoryHooks(self.compressor)
         self._closed = False
         self._idempotent: dict[str, RunResult] = {}
+        self._idem_inflight: dict[str, threading.Event] = {}
         self._lock = threading.RLock()
 
     # ---------------- 生命周期 ----------------
@@ -141,8 +142,10 @@ class Agent:
     def _build_context(self, req: RunRequest) -> RunContext:
         if not str(req.objective or "").strip():
             raise ConfigError("RunRequest.objective 不能为空")
-        run_id = self.ids.new_id("run_")
-        trace_id = self.ids.new_id("trace_")
+        # 审批恢复：沿用原 run / trace，保证审计与检查点连续
+        run_id = str((req.metadata or {}).get("resume_run_id") or self.ids.new_id("run_"))
+        trace_id = str((req.metadata or {}).get("resume_trace_id")
+                       or self.ids.new_id("trace_"))
         budget = req.budget or self.config.budget
         meta = {**self.config.metadata, **dict(req.metadata or {})}
         meta.setdefault("audit", self.config.audit)
@@ -166,6 +169,17 @@ class Agent:
         )
 
     def _build_state(self, ctx: RunContext, req: RunRequest) -> RunState:
+        prev = (req.metadata or {}).get("resume_state")
+        if prev is not None:
+            # 从挂起状态继续：保留消息、用量、账本与证据，不再重复 objective
+            return RunState(messages=list(prev.messages), step=int(prev.step or 0),
+                            tool_results=list(prev.tool_results),
+                            retrieved=list(prev.retrieved), summary=prev.summary,
+                            ledger=list(prev.ledger),
+                            memory_delta=list(prev.memory_delta),
+                            usage=prev.usage, artifacts=list(prev.artifacts),
+                            evidence=list(prev.evidence),
+                            cancel_token=req.cancel_token or CancelToken())
         messages = []
         for m in (req.metadata or {}).get("history", []) or []:
             if isinstance(m, dict):
@@ -262,13 +276,36 @@ class Agent:
                     returned_ids=tuple(x.item_id for x in state.retrieved)))
 
     def _run(self, req: RunRequest, sink=None) -> RunResult:
+        """幂等键入口：同键并发只执行一次，其余等待并复用同一结果。"""
         if self._closed:
             raise ConfigError("Agent 已关闭")
         key = req.idempotency_key or ""
+        ev = None
+        owner = False
         if key:
-            with self._lock:
-                if key in self._idempotent:
-                    return self._idempotent[key]
+            while True:
+                with self._lock:
+                    if key in self._idempotent:
+                        return self._idempotent[key]
+                    ev = self._idem_inflight.get(key)
+                    if ev is None:
+                        ev = threading.Event()
+                        self._idem_inflight[key] = ev
+                        owner = True
+                        break
+                ev.wait(timeout=300)
+        try:
+            return self._run_inner(req, sink)
+        finally:
+            if owner:
+                with self._lock:
+                    self._idem_inflight.pop(key, None)
+                ev.set()
+
+    def _run_inner(self, req: RunRequest, sink=None) -> RunResult:
+        if self._closed:
+            raise ConfigError("Agent 已关闭")
+        key = req.idempotency_key or ""
         from .run_hooks import NoopRunHooks
         ctx = self._build_context(req)
         state = self._build_state(ctx, req)
@@ -411,12 +448,15 @@ class RunHandle:
         self._token = req.cancel_token or CancelToken()
         self.req = replace(req, cancel_token=self._token)
         self._done = threading.Event()
+        self._resume_lock = threading.Lock()
         self._result: RunResult | None = None
         self._exc: BaseException | None = None
         self._thread = threading.Thread(target=self._worker, daemon=True)
         self._thread.start()
 
     def _worker(self):
+        # 每次尝试都从干净状态开始，避免上一轮的异常残留到本轮
+        self._exc = None
         try:
             self._result = self.agent.run(self.req)
         except BaseException as e:  # noqa: BLE001
@@ -426,6 +466,8 @@ class RunHandle:
 
     def status(self) -> str:
         if self._done.is_set():
+            if self._exc is not None:
+                return "failed"
             return self._result.status if self._result else "failed"
         return "running"
 
@@ -448,19 +490,28 @@ class RunHandle:
 
     def resume(self, input: Any) -> None:
         # v1 只支持“挂起后重开一轮”，不在同一线程内恢复
-        if not self._done.is_set():
-            raise ConfigError("运行尚未挂起")
-        if self._result is None or self._result.pending is None:
-            raise ConfigError("没有待恢复的挂起状态")
-        meta = dict(self.req.metadata or {})
-        meta["resume"] = input
-        # 只有审批挂起才注入 approval_decision；其它挂起类型只带 resume
-        if str(getattr(self._result.pending, "kind", "") or "") == "approval":
-            pending_data = dict(self._result.pending.data or {})
-            meta["resume_pending"] = dict(pending_data)
-            meta["approval_decision"] = {**pending_data, "decision": input}
-        self.req = replace(self.req, metadata=meta, cancel_token=CancelToken())
-        self._token = self.req.cancel_token
-        self._done.clear()
-        self._thread = threading.Thread(target=self._worker, daemon=True)
-        self._thread.start()
+        with self._resume_lock:
+            if not self._done.is_set():
+                raise ConfigError("运行尚未挂起")
+            if self._result is None or self._result.pending is None:
+                raise ConfigError("没有待恢复的挂起状态")
+            meta = dict(self.req.metadata or {})
+            meta["resume"] = input
+            # 继续同一个 run：沿用 run_id / trace_id，并从挂起时的状态接着跑
+            meta["resume_run_id"] = self._result.run_id
+            meta["resume_trace_id"] = self._result.trace_id
+            if self._result.state is not None:
+                meta["resume_state"] = self._result.state
+            # 只有审批挂起才注入 approval_decision；其它挂起类型只带 resume
+            if str(getattr(self._result.pending, "kind", "") or "") == "approval":
+                pending_data = dict(self._result.pending.data or {})
+                meta["resume_pending"] = dict(pending_data)
+                meta["approval_decision"] = {**pending_data, "decision": input}
+            # 恢复不能复用原来的幂等键：首轮 blocked 结果已按该键缓存，
+            # 复用会直接短路成旧结果（工具永远不执行）。
+            self.req = replace(self.req, metadata=meta,
+                               cancel_token=CancelToken(), idempotency_key=None)
+            self._token = self.req.cancel_token
+            self._done.clear()
+            self._thread = threading.Thread(target=self._worker, daemon=True)
+            self._thread.start()

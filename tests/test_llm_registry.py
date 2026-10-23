@@ -1,6 +1,7 @@
 """Provider 注册表与同步 ModelPort 适配。"""
 import asyncio
 import os
+import time
 import unittest
 from unittest import mock
 
@@ -229,3 +230,34 @@ class SettingsProviderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SlowStreamingProvider(FakeProvider):
+    def __init__(self, **options):
+        super().__init__(**options)
+        self.closed = False
+        self.emitted = 0
+
+    async def chat_stream(self, messages, tools=None, tool_choice=None, temperature=None):
+        try:
+            for _ in range(1000):
+                self.emitted += 1
+                yield {"content": "x", "tool_calls": None, "done": False}
+                await asyncio.sleep(0.01)
+        finally:
+            self.closed = True
+
+
+class StreamCleanupTests(unittest.TestCase):
+    def test_early_close_stops_background_stream(self):
+        register_provider("slow", lambda **kw: SlowStreamingProvider(**kw))
+        self.addCleanup(lambda: unregister_provider("slow"))
+        model = create_model("slow")
+        stream = model.stream([Message(role="user", content="hi")])
+        self.assertEqual(next(stream).content, "x")
+        stream.close()
+        deadline = time.time() + 3
+        while time.time() < deadline and not model.provider.closed:
+            time.sleep(0.02)
+        self.assertTrue(model.provider.closed, "后台异步生成器未关闭")
+        self.assertLess(model.provider.emitted, 1000)

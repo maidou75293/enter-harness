@@ -16,6 +16,7 @@ from .knowledge import SQLiteKnowledgePort
 from .markdown_knowledge import MarkdownKnowledgePort
 from .markdown_memory import MarkdownMemoryPort
 from .memory import StoreMemoryPort
+from .migrate import dump_ports, load_ports, migrate_ports
 from .postgres_audit import PostgresAuditPort
 from .postgres_knowledge import PostgresKnowledgePort
 from .postgres_memory import PostgresMemoryPort
@@ -51,4 +52,6 @@ __all__ = [
     "InMemoryApprovalQueue", "SQLiteApprovalQueue", "SQLiteStatePort",
     "SQLiteAuditPort", "SQLiteAuditSink", "RuleVerifyPort", "HANDOFF_MARKERS",
     "check_record", "write_record",
+    # migration
+    "dump_ports", "load_ports", "migrate_ports",
 ]

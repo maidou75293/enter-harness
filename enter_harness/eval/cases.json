@@ -1,0 +1,23 @@
+[
+  {
+    "name": "greeting",
+    "objective": "请向用户问好",
+    "expect_contains": ["你好"],
+    "expect_status": "ok",
+    "max_steps": 2
+  },
+  {
+    "name": "math",
+    "objective": "计算 1+1 的结果",
+    "expect_contains": ["2"],
+    "expect_status": "ok",
+    "max_steps": 2
+  },
+  {
+    "name": "status",
+    "objective": "报告当前状态",
+    "expect_contains": ["就绪"],
+    "expect_status": "ok",
+    "max_steps": 2
+  }
+]
