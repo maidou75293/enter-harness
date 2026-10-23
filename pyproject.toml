@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agent-core"
+name = "enter-harness"
 dynamic = ["version"]
-description = "可复用智能体内核：LangGraph 执行器、工具/权限/压缩/hooks/子代理，以及多智能体模块 API"
+description = "企业级智能体运行时内核：可替换模型/存储/权限，内置审批、审计、检查点与多租户隔离"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
@@ -28,9 +28,9 @@ ocr = ["pypdf>=6.0"]
 postgres = ["psycopg[binary]>=3.1"]
 
 [tool.setuptools.packages.find]
-# 只打包 agent_core；app/、web/、tests/、skills/ 属于宿主或测试资产，不进入库
-include = ["agent_core*"]
+# 只打包 enter_harness（含 agent_core 兼容层）；tests/ 等属于测试资产，不进入库
+include = ["enter_harness*", "agent_core*"]
 
 [tool.setuptools.dynamic]
-# 版本单一来源：agent_core/_version.py；避免 __version__ 与发行元数据漂移
-version = { attr = "agent_core._version.__version__" }
+# 版本单一来源：enter_harness/_version.py；避免 __version__ 与发行元数据漂移
+version = { attr = "enter_harness._version.__version__" }

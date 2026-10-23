@@ -1,13 +1,13 @@
-# modules: agent_core.api agent_core.domain agent_core.ports
+# modules: enter_harness.api enter_harness.domain enter_harness.ports
 """阶段 2：RunContext / RunState / Agent 构造与 executor 选择。"""
 import unittest
 
-from agent_core.adapters.memory import FakeModel, InMemoryStore
-from agent_core.api import Agent, AgentConfig
-from agent_core.domain import (
+from enter_harness.adapters.memory import FakeModel, InMemoryStore
+from enter_harness.api import Agent, AgentConfig
+from enter_harness.domain import (
     BudgetProfile, GraphNode, GraphSpec, RunRequest, Scope,
 )
-from agent_core.errors import ConfigError, ScopeError
+from enter_harness.errors import ConfigError, ScopeError
 
 
 def _agent(executor="auto", graph=None):

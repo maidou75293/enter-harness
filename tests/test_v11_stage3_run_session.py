@@ -1,14 +1,14 @@
-# modules: agent_core.api agent_core.executors agent_core.session_api
+# modules: enter_harness.api enter_harness.executors enter_harness.session_api
 """阶段 3：run / stream / start / session 打通（FakeModel + InMemoryStore）。"""
 import unittest
 
-from agent_core.adapters.memory import FakeModel, InMemoryEventSink, InMemoryStore
-from agent_core.api import Agent, AgentConfig
-from agent_core.domain import (
+from enter_harness.adapters.memory import FakeModel, InMemoryEventSink, InMemoryStore
+from enter_harness.api import Agent, AgentConfig
+from enter_harness.domain import (
     BudgetProfile, CancelToken, Message, ModelResponse, RunRequest, Scope,
     ToolCall,
 )
-from agent_core.tooling import ToolRegistry
+from enter_harness.tooling import ToolRegistry
 
 
 def _agent(responses, store=None, sink=None):

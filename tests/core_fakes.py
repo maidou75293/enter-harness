@@ -1,6 +1,6 @@
-"""agent_core 测试替身：内存 Store / 脚本化 Provider / 工具辅助。
+"""enter_harness 测试替身：内存 Store / 脚本化 Provider / 工具辅助。
 
-测试只依赖 agent_core，不 import app。
+测试只依赖 enter_harness，不 import app。
 """
 import asyncio
 import json

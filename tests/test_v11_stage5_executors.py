@@ -1,13 +1,13 @@
-# modules: agent_core.executors agent_core.api
+# modules: enter_harness.executors enter_harness.api
 """阶段 5：react / graph / hybrid 三种执行器与 auto 选择。"""
 import unittest
 
-from agent_core.adapters.memory import FakeModel, InMemoryStore
-from agent_core.api import Agent, AgentConfig
-from agent_core.domain import (
+from enter_harness.adapters.memory import FakeModel, InMemoryStore
+from enter_harness.api import Agent, AgentConfig
+from enter_harness.domain import (
     GraphNode, GraphSpec, ModelResponse, RunRequest, Scope,
 )
-from agent_core.tooling import ToolRegistry
+from enter_harness.tooling import ToolRegistry
 
 
 def _agent(mode, responses):

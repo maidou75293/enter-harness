@@ -1,10 +1,10 @@
 """工具目录：可见性过滤 + 装配期校验。"""
 import unittest
 
-from agent_core.contracts import ToolSpec
-from agent_core.harness import PortSet, ToolActionPort
-from agent_core.tooling import ToolRegistry as FunctionToolRegistry
-from agent_core.tools import ToolRegistry
+from enter_harness.contracts import ToolSpec
+from enter_harness.harness import PortSet, ToolActionPort
+from enter_harness.tooling import ToolRegistry as FunctionToolRegistry
+from enter_harness.tools import ToolRegistry
 
 
 def _registry() -> ToolRegistry:

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_core import HookDenied, HookManager, SkillLibrary
+from enter_harness import HookDenied, HookManager, SkillLibrary
 
 
 class HookTests(unittest.IsolatedAsyncioTestCase):
@@ -70,7 +70,7 @@ class HookTests(unittest.IsolatedAsyncioTestCase):
 
 class SkillTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="agent-core-skills-"))
+        self.tmp = Path(tempfile.mkdtemp(prefix="enter-harness-skills-"))
         self.global_dir = self.tmp / "global"
         self.private = self.tmp / "private"
         for base, name, desc in ((self.global_dir, "deploy", "部署流程"),

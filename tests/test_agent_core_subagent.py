@@ -1,10 +1,10 @@
 """子代理：隔离上下文、工具白名单、嵌套深度上限、trace。"""
 import unittest
 
-from agent_core import SubagentRunner
-from agent_core.tools import ToolRegistry
-from agent_core.errors import SubagentDepthExceeded
-from agent_core.runtime import current_depth
+from enter_harness import SubagentRunner
+from enter_harness.tools import ToolRegistry
+from enter_harness.errors import SubagentDepthExceeded
+from enter_harness.runtime import current_depth
 
 from core_fakes import ScriptedProvider, assistant_tools, call, final
 

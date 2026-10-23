@@ -1,8 +1,8 @@
 """上下文：窗口预算、自动压缩、去重、记忆注入；提示词分层注册表。"""
 import unittest
 
-from agent_core import ContextManager, DictSettings, PromptRegistry, SessionManager
-from agent_core.prompts.registry import (LAYER_CORE, LAYER_RUNTIME,
+from enter_harness import ContextManager, DictSettings, PromptRegistry, SessionManager
+from enter_harness.prompts.registry import (LAYER_CORE, LAYER_RUNTIME,
                                          LAYER_TASK)
 
 from core_fakes import MemoryStore, ScriptedProvider

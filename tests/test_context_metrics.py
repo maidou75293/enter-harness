@@ -1,4 +1,4 @@
-"""上下文拼装指标（agent_core.context.metrics）的用例。
+"""上下文拼装指标（enter_harness.context.metrics）的用例。
 
 只校验计数口径，不比对正文措辞；FakeContext 与
 tests/test_unified_context_model.py 保持同一最小契约。
@@ -6,10 +6,10 @@ tests/test_unified_context_model.py 保持同一最小契约。
 import threading
 import unittest
 
-from agent_core.context.metrics import (ContextMetrics, MetricsRegistry,
+from enter_harness.context.metrics import (ContextMetrics, MetricsRegistry,
                                         summarize)
-from agent_core.context.model import Block, BlockMeta, content_hash
-from agent_core.context.pipeline import BlockCache, assemble
+from enter_harness.context.model import Block, BlockMeta, content_hash
+from enter_harness.context.pipeline import BlockCache, assemble
 
 
 class FakeContext:

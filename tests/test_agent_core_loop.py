@@ -2,8 +2,8 @@
 import asyncio
 import unittest
 
-from agent_core.loop import AgentLoop
-from agent_core.loop.loop import _failure_hint, age_tool_outputs
+from enter_harness.loop import AgentLoop
+from enter_harness.loop.loop import _failure_hint, age_tool_outputs
 
 from core_fakes import (RecordingBus, ScriptedProvider, assistant_tools,
                         call, final)

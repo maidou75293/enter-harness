@@ -1,7 +1,7 @@
 """默认 IdentityPort：静态目录 / 租户校验 / 过期 / 能力交集。"""
 import unittest
 
-from agent_core.harness.identity import StaticIdentityPort
+from enter_harness.harness.identity import StaticIdentityPort
 
 
 class IdentityTests(unittest.TestCase):

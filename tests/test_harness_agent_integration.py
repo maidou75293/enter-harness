@@ -1,13 +1,13 @@
-# modules: agent_core.api agent_core.executors agent_core.harness
-"""Harness 端口接入 Agent 主循环：审计 / 检查点 / 审批 / 验收。"""
+# modules: enter_harness.api enter_harness.executors enter_harness.harness
+"""内核端口接入 Agent 主循环：审计 / 检查点 / 审批 / 验收。"""
 import unittest
 
-from agent_core.adapters.memory import FakeModel, InMemoryStore
-from agent_core.api import Agent, AgentConfig
-from agent_core.domain import Decision, ModelResponse, RunRequest, Scope, ToolCall
-from agent_core.harness import (RuleVerifyPort, SQLiteApprovalQueue,
+from enter_harness.adapters.memory import FakeModel, InMemoryStore
+from enter_harness.api import Agent, AgentConfig
+from enter_harness.domain import Decision, ModelResponse, RunRequest, Scope, ToolCall
+from enter_harness.harness import (RuleVerifyPort, SQLiteApprovalQueue,
                                 SQLiteAuditPort, SQLiteStatePort)
-from agent_core.tooling import ToolRegistry
+from enter_harness.tooling import ToolRegistry
 
 
 class AskPolicy:

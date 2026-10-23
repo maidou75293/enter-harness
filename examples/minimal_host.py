@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from agent_core import (
+from enter_harness import (
     Agent, AgentConfig, FakeModel, InMemoryStore, ModelResponse, RunRequest,
     Scope, ToolCall, ToolRegistry,
 )

@@ -1,13 +1,13 @@
-# modules: agent_core.domain agent_core.ports agent_core.adapters.memory
+# modules: enter_harness.domain enter_harness.ports enter_harness.adapters.memory
 """阶段 1：Scope、端口类型、InMemoryStore 事务/隔离、FakeModel。"""
 import unittest
 
-from agent_core.adapters.memory import FakeModel, InMemoryStore
-from agent_core.domain import (
+from enter_harness.adapters.memory import FakeModel, InMemoryStore
+from enter_harness.domain import (
     BudgetProfile, ItemDraft, LedgerRow, Message, ModelResponse, Scope,
     ToolCall, Topic,
 )
-from agent_core.errors import SchemaError
+from enter_harness.errors import SchemaError
 
 
 class ScopeTests(unittest.TestCase):

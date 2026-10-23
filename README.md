@@ -1,27 +1,48 @@
-# agent-core
+# enter-harness
 
-> 可复用、可治理的智能体内核（agent runtime kernel）。
-> 把「模型能做什么」变成「系统可控地做什么」。
+> **企业级智能体运行时内核**（agent runtime kernel）。
+> 把「模型能做什么」变成「企业敢让它在生产环境做什么」。
 
-`agent-core` 是一个 Python 库，不是 HTTP 服务。宿主工程通过 `pip install` 引入，
+`enter-harness` 是一个 Python 库，不是 HTTP 服务。宿主工程通过 `pip install` 引入，
 直接构造 `Agent` 运行任务；模型、存储、权限、事件、工具全部由宿主以端口（Port，
 只定契约、不定厂商的接口）注入。业务代码留在宿主，内核只负责运行时治理。
 
-![agent-core 架构图](docs/architecture.svg)
+> 命名：工程名、发行名、导入名统一为 `enter-harness` / `enter_harness`。
+> 旧名 `agent-core` / `agent_core` 保留兼容层（re-export + 子模块别名），
+> 老宿主不改代码也能继续用；新代码请统一写 `enter_harness`。
+
+它不是演示框架，而是为**多租户、要审批、要审计、要恢复的生产系统**设计的：
+模型可换、存储可换、权限可接，但隔离、审批、审计、恢复这些企业底线由内核统一保证。
+
+![enter-harness 架构图](docs/architecture.svg)
 
 > 一张图看懂：宿主只实现业务；身份、上下文、工具、状态、审计由内核统一治理。
 
 ```python
-from agent_core import Agent, AgentConfig, RunRequest, Scope
+from enter_harness import Agent, AgentConfig, RunRequest, Scope
 
 agent = Agent(AgentConfig(
     scope=Scope("tenant-1", "agent-1", "user-1", ("assistant",)),
-    model=my_model,            # 实现 ModelPort 的适配器
+    model=model,               # 真实模型：create_model(...) 或实现 ModelPort
     store=my_store,            # 实现 StorePort 的适配器
     tools=my_tools,            # ToolRegistry
 ))
 result = agent.run(RunRequest(objective="分析本周销售数据"))
 ```
+
+---
+
+## 为什么适合企业级应用
+
+| 企业要求 | enter-harness 的做法 |
+|---|---|
+| 多租户隔离 | `Scope` 贯穿全链路；记忆 / 知识 / 工具都按租户过滤，跨租户默认拒绝 |
+| 权限与审批 | 工具三级可见性（租户 / 角色 / scope）+ `needs_approval` → 落单 → 幂等恢复 |
+| 可审计 | 审计只追加、带哈希链；改任何历史记录 `verify_chain()` 立刻断链 |
+| 可恢复 | 运行状态与检查点（start / tool / approval / done），失败可续跑 |
+| 可横向扩展 | PostgreSQL 后端 + 部分唯一索引 + advisory lock，多副本并发写不撞车 |
+| 可替换、不被绑定 | 模型、存储、权限、事件全部端口化；换模型 / 换库不改业务代码 |
+| 可验证 | 311 项单元测试 + 三后端端到端（含审批闭环），发版有基线 |
 
 ---
 
@@ -36,7 +57,7 @@ result = agent.run(RunRequest(objective="分析本周销售数据"))
 - 出了事怎么审计？谁在什么时候对什么做了什么？
 - 换个产品，这套运行时能不能直接复用？
 
-`agent-core` 把这些问题收进内核，用统一端口和默认实现解决；
+`enter-harness` 把这些问题收进内核，用统一端口和默认实现解决；
 产品只实现自己的模型、存储和权限，不再各自重写一遍运行时。
 
 ---
@@ -47,7 +68,7 @@ result = agent.run(RunRequest(objective="分析本周销售数据"))
 
 - 公开入口只有 `Agent.run / stream / start`（会话用 `Agent.session(...)`）；
 - 模型、存储、权限、事件、工具全部端口化，不绑定厂商；
-- `agent_core/` 不反向依赖任何业务模块，可直接被多个宿主复用。
+- `enter_harness/` 不反向依赖任何业务模块，可直接被多个宿主复用。
 
 ### 2. 10 个治理端口，覆盖 Agent 运行全链路
 
@@ -76,7 +97,7 @@ result = agent.run(RunRequest(objective="分析本周销售数据"))
 | PostgreSQL | PostgreSQL | PostgreSQL | 多副本、服务端、并发写 |
 
 ```python
-from agent_core.harness import build_local_ports
+from enter_harness.harness import build_local_ports
 
 ports = build_local_ports("/data/agent", backend="sqlite")      # 默认
 ports = build_local_ports("/data/agent", backend="markdown")    # 人可读写
@@ -84,7 +105,7 @@ ports = build_local_ports("/data/agent", backend="postgres",    # 多副本
                           dsn="postgresql://user:pass@host:5432/db")
 ```
 
-- PostgreSQL 可选依赖：`pip install 'agent-core[postgres]'`；
+- PostgreSQL 可选依赖：`pip install 'enter-harness[postgres]'`；
 - 记忆写入有 R1 唯一约束（同租户 / 范围 / key / 条件只能有一条 active），
   PostgreSQL 用部分唯一索引 + advisory lock 保证并发安全；
 - Markdown 人工改正文会自动重算指纹；已审核知识被改后自动退回 `pending`；
@@ -135,6 +156,8 @@ ports = build_local_ports("/data/agent", backend="postgres",    # 多副本
 ### 9. 可扩展，不锁死实现
 
 - `ModelPort`：`complete / stream / count_tokens / embed`；
+- provider 注册表：内置 OpenAI 兼容实现，可 `register_provider` 接入任意厂商，
+  `create_model` 直接产出同步 `ModelPort`，可选用 `on_delta` 做流式；
 - `StorePort` / `AgentStorePort`：记忆、事务、ledger、会话；
 - `ToolPolicyPort`：工具调用前 `allow / ask / deny`；
 - `EventSink`：start / model / node / done 事件；
@@ -142,13 +165,13 @@ ports = build_local_ports("/data/agent", backend="postgres",    # 多副本
 
 ### 10. 可验证
 
-- 283 项单元测试（公开仓基线；本地含旧宿主测试时为 288）；
+- 311 项单元测试（公开仓基线；本地含旧宿主测试时为 316）；
 - 存储端到端覆盖 SQLite / Markdown / PostgreSQL，并串起
   记忆 → 上下文 → 知识审核 → 检查点 → 审计链 → Agent 运行 → 审批闭环；
 - PostgreSQL 用例在未设 `HARNESS_PG_DSN` 时自动跳过，不拖累本地开发；
-- 版本号单一来源（`agent_core/_version.py`）：`agent_core.__version__`、
+- 版本号单一来源（`enter_harness/_version.py`）：`enter_harness.__version__`、
   `pyproject.toml`、已安装包的发行元数据三者同源，`tests/test_version.py` 守护；
-  宿主可以直接用 `agent_core.__version__` 打点，不必自己读 `importlib.metadata`。
+  宿主可以直接用 `enter_harness.__version__` 打点，不必自己读 `importlib.metadata`。
 
 ---
 
@@ -180,24 +203,58 @@ flowchart LR
 
 ```bash
 # 从 GitHub 安装（带 PostgreSQL 后端）
-pip install "agent-core[postgres] @ git+https://github.com/maidou75293/agent-core.git@v1.1.2"
+pip install "enter-harness[postgres] @ git+https://github.com/maidou75293/enter-harness.git@v1.2.0"
 
 # 或本地开发
-pip install -e /path/to/agent-core
+pip install -e /path/to/enter-harness
 ```
 
-最小用法：
+### 接入真实大模型
+
+内置 `openai` provider 走 OpenAI 兼容协议，OpenAI、DeepSeek、通义、vLLM、
+Ollama、one-api 网关都适用；返回值已经是同步 `ModelPort`，直接交给 `Agent`：
 
 ```python
-from agent_core import (Agent, AgentConfig, FakeModel, InMemoryStore,
-                        ModelResponse, RunRequest, Scope, ToolRegistry)
+from enter_harness import Agent, AgentConfig, create_model
+
+model = create_model(
+    "openai",
+    base_url="https://api.deepseek.com/v1",   # 任意 OpenAI 兼容地址
+    api_key=os.environ["DEEPSEEK_API_KEY"],   # 不要把密钥写进代码
+    name="deepseek-chat",
+)
+agent = Agent(AgentConfig(scope=..., model=model, store=..., tools=...))
+```
+
+流式（SSE / 逐字输出）只要传一个回调：
+
+```python
+model = create_model("openai", base_url=..., api_key=..., name=...,
+                     on_delta=lambda text: send_to_client(text))
+```
+
+- 环境变量缺省：`OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`；
+- 其他厂商或私有网关：`register_provider("my", factory)` 注册一个返回
+  `async chat / complete` 对象的工厂，再用 `create_model("my", ...)`；
+- 多套模型配置：`build_model(settings)` 按 `models.profiles` 里的
+  `provider` 字段选择，返回同样的同步 `ModelPort`；
+- 流式默认请求 `stream_options.include_usage`，结束时能拿到 `usage` 与
+  `finish_reason`（个别网关不认就传 `stream_usage=False`）；
+- 连接错误 / 408 / 429 / 5xx 默认重试 2 次、指数退避；400 等业务错误不重试；
+- `ModelPort.stream()` 每个 delta 带**累计**的 `tool_calls`，可直接消费工具调用。
+
+### 最小可运行示例
+
+```python
+from enter_harness import (Agent, AgentConfig, FakeModel, InMemoryStore,
+                           ModelResponse, RunRequest, Scope, ToolRegistry)
 
 tools = ToolRegistry()
 tools.register("echo", lambda text="": text, "回显文本")
 
 agent = Agent(AgentConfig(
     scope=Scope("tenant-1", "agent-1", "user-1", ("assistant",)),
-    model=FakeModel([ModelResponse(content="你好，我是 agent-core")]),
+    model=FakeModel([ModelResponse(content="你好，我是 enter-harness")]),
     store=InMemoryStore(),
     tools=tools,
 ))
@@ -206,10 +263,10 @@ print(result.status, result.answer)
 agent.close()
 ```
 
-接 Harness 存储：
+接入模型与存储：
 
 ```python
-from agent_core.harness import build_local_ports
+from enter_harness.harness import build_local_ports
 
 ports = build_local_ports("/data/agent", backend="sqlite")
 # ports.memory / ports.knowledge / ports.state / ports.audit
@@ -218,7 +275,7 @@ ports = build_local_ports("/data/agent", backend="sqlite")
 把审计、状态、审批、验收接进 `Agent`：
 
 ```python
-from agent_core.harness import RuleVerifyPort, SQLiteApprovalQueue
+from enter_harness.harness import RuleVerifyPort, SQLiteApprovalQueue
 
 AgentConfig(
     scope=..., model=..., store=..., tools=...,
@@ -236,13 +293,13 @@ AgentConfig(
 
 ## 文档
 
-- [Harness 使用手册](docs/Harness-使用手册-v1.md)：三套后端、PostgreSQL 完整步骤、常用流程、排错
-- [Harness 接入指南](docs/Harness-接入指南-v1.md)：宿主装配、调用顺序、审批恢复、常见错误
-- [Harness 端口清单](docs/Harness-端口清单-v1.md)：10 个端口的契约与代码落点
-- [Harness 命名规范](docs/Harness-命名规范-v1.md)：端口 / 实现 / 类型 / 字段 / 状态枚举
+- [enter-harness 使用手册](docs/使用手册-v1.md)：三套后端、PostgreSQL 完整步骤、常用流程、排错
+- [宿主接入指南](docs/接入指南-v1.md)：宿主装配、调用顺序、审批恢复、常见错误
+- [enter-harness 端口清单](docs/端口清单-v1.md)：10 个端口的契约与代码落点
+- [enter-harness 命名规范](docs/命名规范-v1.md)：端口 / 实现 / 类型 / 字段 / 状态枚举
 - [本地存储格式](docs/本地存储格式-v1.md)：SQLite / Markdown / PostgreSQL 的目录与表结构
-- [agent-core 设计](docs/agent-core-设计.md)：模块划分、依赖方向、公开 API、迁移映射
-- [Harness 流水线](docs/核心模型-Harness流水线-v1.md)：7 个模块、10 个端口、运行闭环
+- [enter-harness 设计](docs/enter-harness-设计.md)：模块划分、依赖方向、公开 API、迁移映射
+- [运行流水线](docs/核心模型-运行流水线-v1.md)：7 个模块、10 个端口、运行闭环
 - [多租户与沙箱](docs/多租户与沙箱.md)：租户隔离、权限与执行边界
 
 ## 适用场景

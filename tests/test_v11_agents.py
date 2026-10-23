@@ -1,11 +1,11 @@
-# modules: agent_core.agents agent_core.adapters.memory agent_core.domain agent_core.ports
+# modules: enter_harness.agents enter_harness.adapters.memory enter_harness.domain enter_harness.ports
 """v1.1 多智能体：Agent/Session 管理 API 与租户/智能体隔离。"""
 import unittest
 
-from agent_core.adapters.memory import InMemoryStore
-from agent_core.agents import DEFAULT_AGENT_ID, AgentService
-from agent_core.domain import ItemDraft, Scope
-from agent_core.errors import ConfigError, ConflictError, NotFoundError
+from enter_harness.adapters.memory import InMemoryStore
+from enter_harness.agents import DEFAULT_AGENT_ID, AgentService
+from enter_harness.domain import ItemDraft, Scope
+from enter_harness.errors import ConfigError, ConflictError, NotFoundError
 
 
 class AgentServiceTests(unittest.TestCase):
@@ -107,10 +107,10 @@ class AgentServiceTests(unittest.TestCase):
             Scope("t2", "u1", ("arch",)), "", {}, 10)), 0)
 
     def test_runtime_session_and_memory_bound_to_agent(self):
-        from agent_core.adapters.memory import FakeModel
-        from agent_core.api import Agent, AgentConfig
-        from agent_core.domain import ModelResponse, ToolCall
-        from agent_core.tooling import ToolRegistry
+        from enter_harness.adapters.memory import FakeModel
+        from enter_harness.api import Agent, AgentConfig
+        from enter_harness.domain import ModelResponse, ToolCall
+        from enter_harness.tooling import ToolRegistry
 
         a1 = self.svc.create_agent("t1", "助手 A")
         a2 = self.svc.create_agent("t1", "助手 B")

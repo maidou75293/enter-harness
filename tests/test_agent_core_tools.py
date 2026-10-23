@@ -4,10 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_core import HookDenied, HookManager, PolicyDecision, RulePolicy
-from agent_core.tools import ToolRegistry
-from agent_core.contracts import ToolSpec
-from agent_core.tools import OutputLimiter, land_output, safe_path
+from enter_harness import HookDenied, HookManager, PolicyDecision, RulePolicy
+from enter_harness.tools import ToolRegistry
+from enter_harness.contracts import ToolSpec
+from enter_harness.tools import OutputLimiter, land_output, safe_path
 
 
 class PolicyTests(unittest.TestCase):
@@ -43,7 +43,7 @@ class Approver:
 
 class ToolRegistryTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="agent-core-tools-"))
+        self.tmp = Path(tempfile.mkdtemp(prefix="enter-harness-tools-"))
 
     async def test_schema_and_whitelist(self):
         reg = ToolRegistry()
@@ -161,7 +161,7 @@ class ToolRegistryTests(unittest.IsolatedAsyncioTestCase):
 
 class WorkspaceTests(unittest.TestCase):
     def test_safe_path(self):
-        tmp = Path(tempfile.mkdtemp(prefix="agent-core-ws-"))
+        tmp = Path(tempfile.mkdtemp(prefix="enter-harness-ws-"))
         p = safe_path("a/b.txt", tmp)
         # 跨平台断言：Windows 的 str(path) 用反斜杠，不能按 "a/b.txt" 判断
         self.assertEqual(p.parts[-2:], ("a", "b.txt"))

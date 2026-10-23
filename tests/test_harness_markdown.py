@@ -3,10 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_core.context import MemoryRecord, content_hash
-from agent_core.harness import (MarkdownKnowledgePort, MarkdownMemoryPort,
+from enter_harness.context import MemoryRecord, content_hash
+from enter_harness.harness import (MarkdownKnowledgePort, MarkdownMemoryPort,
                                 build_local_ports)
-from agent_core.harness.markdown_io import parse
+from enter_harness.harness.markdown_io import parse
 
 
 def _rec(**kw):

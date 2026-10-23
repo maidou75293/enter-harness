@@ -1,13 +1,13 @@
-# modules: agent_core
+# modules: enter_harness
 """阶段 6：冻结接口契约测试 + 最小示例。"""
 import unittest
 
-import agent_core as ac
-from agent_core import (
+import enter_harness as ac
+from enter_harness import (
     Agent, AgentConfig, FakeModel, GraphNode, GraphSpec, InMemoryStore,
     ModelResponse, RunRequest, Scope, ToolCall, ToolRegistry,
 )
-from agent_core.errors import ModelError, ScopeError
+from enter_harness.errors import ModelError, ScopeError
 
 
 def _tools():
@@ -100,7 +100,7 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(a.run(RunRequest("hi")).answer, "ok")
 
     def test_retrieval_fills_run_state(self):
-        from agent_core import ItemDraft
+        from enter_harness import ItemDraft
         store = InMemoryStore()
         with store.transaction() as tx:
             tx.put_item(Scope("t1", "u", ["r"]), ItemDraft(content="端口是 9000"))

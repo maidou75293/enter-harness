@@ -1,4 +1,4 @@
-# modules: agent_core.harness agent_core.api agent_core.context
+# modules: enter_harness.harness enter_harness.api enter_harness.context
 """端到端：SQLite / Markdown / PostgreSQL 三套后端跑同一组端口与 Agent 流程。
 
 用法：
@@ -16,13 +16,13 @@ import tempfile
 import time
 import uuid
 
-from agent_core.adapters.memory import FakeModel, InMemoryStore
-from agent_core.api import Agent, AgentConfig
-from agent_core.context import MemoryRecord, assemble
-from agent_core.domain import Decision, ModelResponse, RunRequest, Scope, ToolCall
-from agent_core.harness import (MemoryContextPort, SQLiteApprovalQueue,
+from enter_harness.adapters.memory import FakeModel, InMemoryStore
+from enter_harness.api import Agent, AgentConfig
+from enter_harness.context import MemoryRecord, assemble
+from enter_harness.domain import Decision, ModelResponse, RunRequest, Scope, ToolCall
+from enter_harness.harness import (MemoryContextPort, SQLiteApprovalQueue,
                                 build_local_ports)
-from agent_core.tooling import ToolRegistry
+from enter_harness.tooling import ToolRegistry
 
 
 class AskPolicy:

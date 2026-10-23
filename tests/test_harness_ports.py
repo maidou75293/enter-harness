@@ -1,12 +1,12 @@
-"""Harness 10 端口契约 + 默认实现用例。"""
+"""内核 10 端口契约 + 默认实现用例。"""
 import sqlite3
 import time
 import unittest
 
-from agent_core.context import (MemoryRecord, SQLiteMemoryStore, WriteResult,
+from enter_harness.context import (MemoryRecord, SQLiteMemoryStore, WriteResult,
                                 assemble, Block, BlockMeta)
-from agent_core.errors import ContextOverflow
-from agent_core.harness import (ActionResult, DefaultIngestPort, MemoryPort,
+from enter_harness.errors import ContextOverflow
+from enter_harness.harness import (ActionResult, DefaultIngestPort, MemoryPort,
                                 PortSet, RuleVerifyPort, SQLiteAuditPort,
                                 SQLiteStatePort, StoreMemoryPort, ToolActionPort)
 

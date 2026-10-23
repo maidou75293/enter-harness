@@ -5,10 +5,10 @@
 """
 import unittest
 
-from agent_core.context import (Block, BlockMeta, ContextPort, MemoryRecord,
+from enter_harness.context import (Block, BlockMeta, ContextPort, MemoryRecord,
                                 SQLiteMemoryStore, assemble)
-from agent_core.harness.context import MemoryContextPort
-from agent_core.harness.memory import StoreMemoryPort
+from enter_harness.harness.context import MemoryContextPort
+from enter_harness.harness.memory import StoreMemoryPort
 
 
 def rec(**kw):

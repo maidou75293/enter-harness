@@ -3,7 +3,7 @@ import hashlib
 import time
 import unittest
 
-from agent_core.harness.knowledge import SQLiteKnowledgePort
+from enter_harness.harness.knowledge import SQLiteKnowledgePort
 
 
 def _sha(text: str) -> str:

@@ -6,7 +6,7 @@
 import time
 import unittest
 
-from agent_core.context import (Block, BlockCache, BlockMeta, MemoryRecord,
+from enter_harness.context import (Block, BlockCache, BlockMeta, MemoryRecord,
                                 assemble, content_hash, derive_authority,
                                 select_records)
 

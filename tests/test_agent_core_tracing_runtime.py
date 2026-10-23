@@ -2,9 +2,9 @@
 import asyncio
 import unittest
 
-from agent_core import Tracer
-from agent_core.loop import AgentLoop
-from agent_core.runtime import (bind, current_depth, current_run, current_session,
+from enter_harness import Tracer
+from enter_harness.loop import AgentLoop
+from enter_harness.runtime import (bind, current_depth, current_run, current_session,
                                 current_tenant, current_user, snapshot)
 
 from core_fakes import RecordingBus, ScriptedProvider

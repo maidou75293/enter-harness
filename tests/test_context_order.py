@@ -1,9 +1,9 @@
 """D1 次序：assemble 的 sort_key 必须与 select_records 的 scope_rank 一致。"""
 import unittest
 
-from agent_core.context.model import (Block, BlockMeta, SCOPE_ORDER_BY_KIND,
+from enter_harness.context.model import (Block, BlockMeta, SCOPE_ORDER_BY_KIND,
                                       scope_rank)
-from agent_core.context.pipeline import assemble
+from enter_harness.context.pipeline import assemble
 
 
 class FakeContext:

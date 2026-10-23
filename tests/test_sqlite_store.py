@@ -1,7 +1,7 @@
 """默认 SQLite 存储：内核写/读/归档的用例。"""
 import unittest
 
-from agent_core.context import MemoryRecord, SQLiteMemoryStore
+from enter_harness.context import MemoryRecord, SQLiteMemoryStore
 
 
 class SQLiteStoreTests(unittest.TestCase):

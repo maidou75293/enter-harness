@@ -3,8 +3,8 @@ import os
 import unittest
 import uuid
 
-from agent_core.context import MemoryRecord
-from agent_core.harness import (PostgresAuditPort, PostgresKnowledgePort,
+from enter_harness.context import MemoryRecord
+from enter_harness.harness import (PostgresAuditPort, PostgresKnowledgePort,
                                 PostgresMemoryPort, PostgresStatePort)
 
 DSN = os.environ.get("HARNESS_PG_DSN", "")

@@ -1,13 +1,13 @@
-# modules: agent_core.compression agent_core.api agent_core.executors
+# modules: enter_harness.compression enter_harness.api enter_harness.executors
 """阶段 4：压缩、RunHooks 调用点、memory_delta 事务落库。"""
 import unittest
 
-from agent_core.adapters.memory import FakeModel, InMemoryStore
-from agent_core.api import Agent, AgentConfig
-from agent_core.domain import (
+from enter_harness.adapters.memory import FakeModel, InMemoryStore
+from enter_harness.api import Agent, AgentConfig
+from enter_harness.domain import (
     BudgetProfile, Message, ModelResponse, RunRequest, Scope, ToolCall,
 )
-from agent_core.tooling import ToolRegistry
+from enter_harness.tooling import ToolRegistry
 
 
 class CountingHooks:
@@ -100,7 +100,7 @@ class CompressionWriteTests(unittest.TestCase):
 
         class CancelModel:
             def complete(self, messages, tools, budget):
-                from agent_core.domain import CancelToken
+                from enter_harness.domain import CancelToken
                 raise RuntimeError("cancel")
             def stream(self, *a, **kw):
                 yield from ()
