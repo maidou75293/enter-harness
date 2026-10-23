@@ -142,7 +142,7 @@ ports = build_local_ports("/data/agent", backend="postgres",    # 多副本
 
 ### 10. 可验证
 
-- 273 项单元测试（公开仓基线；本地含旧宿主测试时为 278）；
+- 278 项单元测试（公开仓基线；本地含旧宿主测试时为 283）；
 - 存储端到端覆盖 SQLite / Markdown / PostgreSQL，并串起
   记忆 → 上下文 → 知识审核 → 检查点 → 审计链 → Agent 运行 → 审批闭环；
 - PostgreSQL 用例在未设 `HARNESS_PG_DSN` 时自动跳过，不拖累本地开发。
@@ -177,7 +177,7 @@ flowchart LR
 
 ```bash
 # 从 GitHub 安装（带 PostgreSQL 后端）
-pip install "agent-core[postgres] @ git+https://github.com/maidou75293/agent-core.git@v1.1.0"
+pip install "agent-core[postgres] @ git+https://github.com/maidou75293/agent-core.git@v1.1.1"
 
 # 或本地开发
 pip install -e /path/to/agent-core

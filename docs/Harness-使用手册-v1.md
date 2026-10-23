@@ -272,6 +272,20 @@ registry.register("echo", handler)          # 共享工具
   `agent_core.tooling.ToolRegistry`（返回 `FunctionTool`），内部统一成 dict；
   执行结果也兼容 `ToolResult`，不需要宿主自己写翻译层。
 
+### 6.2 上下文排序（D1）
+
+`assemble()` 的块次序由 `BlockMeta.sort_key` 决定，使用
+`scope_rank(kind, scope)`，与 `select_records` 保持同一套 D1 规则：
+
+| kind | scope 优先级 |
+|---|---|
+| `procedural` | platform → project → user → session |
+| `semantic` | project → platform → user → session |
+| `profile` | user → project → platform → session |
+| `episodic` / `working` | session → project → user → platform |
+
+同一 scope 内再按 `priority`、`id` 排序。不要再用全局 `SCOPE_ORDER` 推导拼装顺序。
+
 ---
 
 ## 7. 常用流程

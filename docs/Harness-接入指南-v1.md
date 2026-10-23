@@ -234,6 +234,7 @@ assert ports.check() is True
 | `extra_blocks` 可接受的类型 | 只接受 `Block` 或 `BlockMeta`；直接传 `MemoryRecord` 会抛 `TypeError` |
 | 鉴权目标 | `policy.can(identity, "read", meta)` 传的是 `BlockMeta`，不是正文 `Block` |
 | 异常处理 | `list_blocks` / `get_block` 抛异常会记入 `trace` 并继续，不拖垮整轮；策略异常按拒绝处理 |
+| 块排序（D1） | `BlockMeta.sort_key` 使用 `scope_rank(kind, scope)`，与 `select_records` 一致：semantic 为 project → platform → user，procedural 为 platform → project → user，profile 为 user → project → platform |
 
 ### 3.3 工具可见性
 

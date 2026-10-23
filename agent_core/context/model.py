@@ -119,7 +119,7 @@ class BlockMeta:
     @property
     def sort_key(self) -> tuple:
         return (KIND_ORDER.get(self.kind, 99),
-                SCOPE_ORDER.get(self.scope, 99),
+                scope_rank(self.kind, self.scope),
                 int(self.priority or 0),
                 str(self.id))
 

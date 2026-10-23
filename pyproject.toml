@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-core"
-version = "1.1.0"
+version = "1.1.1"
 description = "可复用智能体内核：LangGraph 执行器、工具/权限/压缩/hooks/子代理，以及多智能体模块 API"
 readme = "README.md"
 license = { text = "Apache-2.0" }
